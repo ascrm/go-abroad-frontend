@@ -1,8 +1,56 @@
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { LucideIcon, Mail } from "lucide-react-native";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuthStore } from "../../src/stores/authStore";
+import { SocialLoginResult, SocialType, appleLogin, googleLogin, qqLogin, wechatLogin } from "../../src/utils/socialLogin";
+
+// 通用的社交登录处理函数
+const handleSocialLogin = async (
+  loginFn: () => Promise<SocialLoginResult>,
+  socialType: SocialType
+) => {
+  const { socialLogin } = useAuthStore.getState();
+
+  try {
+    const result = await loginFn();
+
+    if (result.error) {
+      Alert.alert("登录失败", result.error);
+      return;
+    }
+
+    // 调用后端第三方登录接口
+    await socialLogin({
+      socialType,
+      openid: result.openid || result.code || '',
+      unionid: result.unionid,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      expiresIn: result.expiresIn,
+      nickname: result.nickname,
+      avatar: result.avatar,
+      gender: result.gender,
+    });
+
+    router.replace("/(tabs)/home");
+  } catch (error: any) {
+    Alert.alert("登录失败", error.message || "登录失败，请重试");
+  }
+};
+
+// 微信登录处理
+const handleWechatLogin = () => handleSocialLogin(wechatLogin, SocialType.Wechat);
+
+// QQ 登录处理
+const handleQQLogin = () => handleSocialLogin(qqLogin, SocialType.QQ);
+
+// Google 登录处理
+const handleGoogleLogin = () => handleSocialLogin(googleLogin, SocialType.Google);
+
+// Apple 登录处理
+const handleAppleLogin = () => handleSocialLogin(appleLogin, SocialType.Apple);
 
 // 登录方式数据
 const loginMethods: {
@@ -28,7 +76,7 @@ const loginMethods: {
     iconType: "simple",
     iconName: "WeChat",
     iconColor: "#07C160",
-    onPress: () => console.log("微信登录"),
+    onPress: handleWechatLogin,
   },
   {
     id: "qq",
@@ -36,7 +84,7 @@ const loginMethods: {
     iconType: "simple",
     iconName: "QQ",
     iconColor: "#12B7F5",
-    onPress: () => console.log("QQ登录"),
+    onPress: handleQQLogin,
   },
   {
     id: "google",
@@ -44,7 +92,7 @@ const loginMethods: {
     iconType: "simple",
     iconName: "Google",
     iconColor: "#EA4335",
-    onPress: () => console.log("Google登录"),
+    onPress: handleGoogleLogin,
   },
   {
     id: "apple",
@@ -52,7 +100,7 @@ const loginMethods: {
     iconType: "simple",
     iconName: "Apple",
     iconColor: "#000000",
-    onPress: () => console.log("Apple登录"),
+    onPress: handleAppleLogin,
   },
 ];
 

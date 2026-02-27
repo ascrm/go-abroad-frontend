@@ -9,14 +9,34 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.goabroad.app",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "weixin",
+          "wechat",
+          "mqqopensdkapiV3",
+          "mqqopensdkapiV2"
+        ]
+      }
     },
     "android": {
+      "package": "com.goabroad.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#E6F4FE"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            { "scheme": "wechat" },
+            { "scheme": "mqq" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/images/logo.png"

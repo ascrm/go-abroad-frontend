@@ -1,6 +1,7 @@
 import {
   Building2,
   Car,
+  Check,
   Coffee,
   Languages,
   Map,
@@ -14,129 +15,50 @@ import {
   Wallet,
   Zap
 } from "lucide-react-native";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 // 1. 官方与合规资源
-const officialResources = [
-  { id: 1, title: "签证申请中心", desc: "各国签证办理入口", url: "#", icon: ShieldCheck },
-  { id: 2, title: "Visit Japan Web", desc: "日本入境电子申报", url: "#", icon: Plane },
-  { id: 3, title: "泰国旅游局", desc: "官方旅游资讯", url: "#", icon: Building2 },
+export const officialResources = [
+  { id: 1, title: "日本 e-Visa", desc: "电子签申请", url: "https://www.evisa.go.jp", icon: Plane, badge: "OFFICIAL", meta: { time: "3-5工作日", location: "全球" } },
+  { id: 2, title: "Visit Japan Web", desc: "日本入境审查及海关申报电子系统，替代纸质版申报单。", url: "https://www.vjw.go.jp", icon: ShieldCheck, badge: "OFFICIAL", meta: { time: "即时生成", location: "全日主要机场" } },
+  { id: 3, title: "泰国旅游局", desc: "官方旅游资讯", url: "https://www.tourismthailand.org", icon: Building2, badge: "OFFICIAL", meta: { time: "实时", location: "全球" } },
+  { id: 4, title: "英国 GOV.UK", desc: "签证申请入口", url: "https://www.gov.uk/browse/visas-immigration", icon: ShieldCheck, badge: "OFFICIAL", meta: { time: "不确定", location: "全球" } },
+  { id: 5, title: "美国 CDC", desc: "健康与旅行警告", url: "https://wwwnc.cdc.gov/travel", icon: ShieldCheck, badge: "OFFICIAL", meta: { time: "实时", location: "美国" } },
 ];
 
 // 2. 住宿与安家速达
-const stayResources = [
-  { id: 1, title: "Booking.com", desc: "全球酒店预订", url: "#", icon: MapPin },
-  { id: 2, title: "Airbnb", desc: "特色民宿体验", url: "#", icon: Building2 },
-  { id: 3, title: "Agoda", desc: "亚洲特价酒店", url: "#", icon: MapPin },
-  { id: 4, title: "星野集团", desc: "高端温泉度假", url: "#", icon: Building2 },
+export const stayResources = [
+  { id: 1, title: "Booking.com", desc: "全球酒店", url: "https://www.booking.com", icon: MapPin, badge: "HOT", meta: { time: "即时确认", location: "全球" } },
+  { id: 2, title: "Airbnb", desc: "特色民宿", url: "https://www.airbnb.com", icon: Building2, badge: "POPULAR", meta: { time: "即时确认", location: "全球" } },
+  { id: 3, title: "Agoda", desc: "亚洲酒店", url: "https://www.agoda.com", icon: MapPin, badge: "RECOMMENDED", meta: { time: "即时确认", location: "亚洲" } },
+  { id: 4, title: "星野集团", desc: "日式温泉", url: "https://www.hoshinoresorts.com", icon: Building2, badge: "LUXURY", meta: { time: "需预约", location: "日本" } },
+  { id: 5, title: "万豪官网", url: "https://www.marriott.com", desc: "国际连锁", icon: Building2, badge: "OFFICIAL", meta: { time: "即时确认", location: "全球" } },
+  { id: 6, title: "jalan", desc: "日本旅行网", url: "https://www.jalan.net", icon: Building2, badge: "RECOMMENDED", meta: { time: "需预约", location: "日本" } },
 ];
 
 // 3. 交通与移动枢纽
-const transportResources = [
-  { id: 1, title: "Skyscanner", desc: "机票比价预订", url: "#", icon: Plane },
-  { id: 2, title: "欧铁 Eurail", desc: "欧洲铁路通票", url: "#", icon: Train },
-  { id: 3, title: "Google Maps", desc: "必备导航地图", url: "#", icon: Map },
-  { id: 4, title: "Uber / Grab", desc: "网约车平台", url: "#", icon: Car },
+export const transportResources = [
+  { id: 1, title: "Skyscanner", desc: "机票比价", url: "https://www.skyscanner.com", icon: Plane, badge: "TOOLS", meta: { time: "实时", location: "全球" } },
+  { id: 2, title: "Google Maps", desc: "地图导航", url: "https://www.google.com/maps", icon: Map, badge: "ESSENTIAL", meta: { time: "实时", location: "全球" } },
+  { id: 3, title: "Uber", desc: "网约车", url: "https://www.uber.com", icon: Car, badge: "ESSENTIAL", meta: { time: "实时", location: "全球" } },
+  { id: 4, title: "JR Pass", desc: "铁路通票", url: "https://www.japanrailpass.com", icon: Train, badge: "OFFICIAL", meta: { time: "3工作日", location: "日本" } },
+  { id: 5, title: "Eurail", desc: "欧铁通票", url: "https://www.eurail.com", icon: Train, badge: "OFFICIAL", meta: { time: "3工作日", location: "欧洲" } },
+  { id: 6, title: "携程国际", desc: "机票酒店", url: "https://flights.ctrip.com", icon: Plane, badge: "CHINESE", meta: { time: "实时", location: "全球" } },
 ];
 
 // 4. 体验与门票直达
-const experienceResources = [
-  { id: 1, title: "Klook", desc: "景点门票/一日游", url: "#", icon: Ticket },
-  { id: 2, title: "GetYourGuide", desc: "当地体验预订", url: "#", icon: Ticket },
-  { id: 3, title: "Tabelog", desc: "日本餐厅点评", url: "#", icon: Utensils },
-  { id: 4, title: "OpenTable", desc: "餐厅预订", url: "#", icon: Coffee },
+export const experienceResources = [
+  { id: 1, title: "Klook", desc: "门票预订", url: "https://www.klook.com", icon: Ticket, badge: "POPULAR", meta: { time: "即时确认", location: "全球" } },
+  { id: 2, title: "GetYourGuide", desc: "当地体验", url: "https://www.getyourguide.com", icon: Ticket, badge: "POPULAR", meta: { time: "需预约", location: "全球" } },
+  { id: 3, title: "Tabelog", desc: "餐厅点评", url: "https://www.tabelog.com", icon: Utensils, badge: "LOCAL", meta: { time: "实时", location: "日本" } },
+  { id: 4, title: "OpenTable", desc: "餐厅预订", url: "https://www.opentable.com", icon: Coffee, badge: "POPULAR", meta: { time: "需预约", location: "美国/欧洲" } },
+  { id: 5, title: "迪士尼官网", desc: "门票套餐", url: "https://www.disney.com", icon: Ticket, badge: "OFFICIAL", meta: { time: "需预约", location: "全球" } },
+  { id: 6, title: "环球影城", desc: "门票快速通", url: "https://www.usj.co.jp", icon: Ticket, badge: "OFFICIAL", meta: { time: "需预约", location: "日本/美国" } },
 ];
 
 // 5. 应急与生存工具
-const utilityResources = [
-  { id: 1, title: "汇率计算器", desc: "实时汇率换算", url: "#", icon: Wallet },
-  { id: 2, title: "Google Translate", desc: "即时语音翻译", url: "#", icon: Languages },
-  { id: 3, title: "紧急求助", desc: "使领馆联系名录", url: "#", icon: Phone },
-  { id: 4, title: "ATM 地图", desc: "附近取现点", url: "#", icon: Zap },
+export const utilityResources = [
+  { id: 1, title: "iMoney", desc: "汇率计算", url: "https://www.imocha.cn", icon: Wallet, badge: "TOOLS", meta: { time: "实时", location: "全球" } },
+  { id: 2, title: "Google Translate", desc: "即时翻译", url: "https://translate.google.com", icon: Languages, badge: "ESSENTIAL", meta: { time: "实时", location: "全球" } },
+  { id: 3, title: "中国领事保护", desc: "紧急热线", url: "tel:+861012308", icon: Phone, badge: "EMERGENCY", meta: { time: "24小时", location: "全球" } },
+  { id: 4, title: "ATM Finder", desc: "取现点", url: "https://www.mastercard.com", icon: Zap, badge: "TOOLS", meta: { time: "实时", location: "全球" } },
 ];
-
-const ResourceSection = ({ title, resources, color, count }: { title: string, resources: any[], color: string, count?: number }) => (
-  <View className="mb-8">
-    <View className="flex-row items-center justify-between px-4 mb-4">
-      <View className="flex-row items-center gap-2">
-        <View className={`w-1 h-4 rounded-full`} style={{ backgroundColor: color }} />
-        <Text className="text-base font-bold text-gray-900">{title}</Text>
-      </View>
-    </View>
-
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="pl-4 pr-2 gap-3">
-      {resources.map((item) => (
-        <TouchableOpacity 
-          key={item.id} 
-          className="w-32 bg-white rounded-xl p-4 mr-4"
-          onPress={() => console.log(item.url)}
-        >
-          <View className="w-10 h-10 rounded-lg items-center justify-center mb-2" style={{ backgroundColor: `${color}15` }}>
-            <item.icon size={20} color={color} />
-          </View>
-          <Text className="text-sm font-semibold text-gray-900 mb-1" numberOfLines={1}>{item.title}</Text>
-          <Text className="text-xs text-gray-400" numberOfLines={1}>{item.desc}</Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  </View>
-);
-
-export const TourismResources = () => {
-  return (
-    <View className="flex-1 bg-gray-50">
-      {/* Search Header */}
-      {/* <View className="bg-white px-4 pt-4 pb-4">
-        <View className="bg-gray-100 rounded-xl flex-row items-center px-3 py-2.5">
-          <Search size={18} color="#9CA3AF" />
-          <TextInput
-            className="flex-1 ml-2 text-sm text-gray-700"
-            placeholder="搜索旅游攻略或工具..."
-            placeholderTextColor="#9CA3AF"
-          />
-        </View>
-      </View> */}
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
-        
-        {/* 1. 官方与合规 */}
-        <View className="mt-4">
-          <ResourceSection 
-            title="官方与合规" 
-            resources={officialResources} 
-            color="#3B82F6" 
-          />
-        </View>
-
-        {/* 2. 住宿与安家 */}
-        <ResourceSection 
-          title="住宿与安家" 
-          resources={stayResources} 
-          color="#8B5CF6" 
-        />
-
-        {/* 3. 交通与移动 */}
-        <ResourceSection 
-          title="交通与移动" 
-          resources={transportResources} 
-          color="#10B981" 
-        />
-
-        {/* 4. 体验与门票 */}
-        <ResourceSection 
-          title="体验与门票" 
-          resources={experienceResources} 
-          color="#F59E0B" 
-        />
-
-        {/* 5. 应急与工具 */}
-        <ResourceSection 
-          title="应急与工具" 
-          resources={utilityResources} 
-          color="#EF4444" 
-        />
-
-      </ScrollView>
-    </View>
-  );
-};

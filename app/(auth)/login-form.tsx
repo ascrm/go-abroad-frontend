@@ -1,13 +1,34 @@
 import { router } from "expo-router";
 import { Eye, EyeOff } from "lucide-react-native";
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuthStore } from "../../src/stores/authStore";
 
 export default function LoginFormScreen() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const { login } = useAuthStore();
+
+  const handleLogin = async () => {
+    if (!identifier.trim() || !password.trim()) {
+      Alert.alert("提示", "请输入账号和密码");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await login(identifier.trim(), password);
+      router.replace("/(tabs)/home");
+    } catch (error: any) {
+      Alert.alert("登录失败", error.message || "请检查账号密码是否正确");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
@@ -80,11 +101,14 @@ export default function LoginFormScreen() {
 
         {/* 登录按钮 */}
         <TouchableOpacity
-          className="bg-gray-900 rounded-xl py-4 mt-16 items-center"
+          className={`rounded-xl py-4 mt-16 items-center ${isLoading ? "bg-gray-400" : "bg-gray-900"}`}
           activeOpacity={0.8}
-          onPress={() => router.push("/(tabs)/home")}
+          onPress={handleLogin}
+          disabled={isLoading}
         >
-          <Text className="text-white text-base font-medium">登录</Text>
+          <Text className="text-white text-base font-medium">
+            {isLoading ? "登录中..." : "登录"}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
