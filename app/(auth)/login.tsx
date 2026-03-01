@@ -4,7 +4,7 @@ import { LucideIcon, Mail } from "lucide-react-native";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuthStore } from "../../src/stores/authStore";
-import { SocialLoginResult, SocialType, appleLogin, googleLogin, qqLogin, wechatLogin } from "../../src/utils/socialLogin";
+import { SocialLoginResult, SocialType, appleLogin, googleLogin, qqLogin } from "../../src/utils/socialLogin";
 
 // 通用的社交登录处理函数
 const handleSocialLogin = async (
@@ -40,11 +40,14 @@ const handleSocialLogin = async (
   }
 };
 
-// 微信登录处理
-const handleWechatLogin = () => handleSocialLogin(wechatLogin, SocialType.Wechat);
-
-// QQ 登录处理
-const handleQQLogin = () => handleSocialLogin(qqLogin, SocialType.QQ);
+// QQ 登录处理（iOS 端暂不支持，显示提示）
+const handleQQLogin = () => {
+  Alert.alert(
+    'iOS QQ 登录暂不支持',
+    '开通条件（满足任意一项）：\n1. iOS 开发者账号（$99/年）\n2. Mac 电脑',
+    [{ text: '知道了' }]
+  );
+};
 
 // Google 登录处理
 const handleGoogleLogin = () => handleSocialLogin(googleLogin, SocialType.Google);
@@ -69,14 +72,6 @@ const loginMethods: {
     icon: Mail,
     iconColor: "#0076D6",
     onPress: () => router.push("/(auth)/login-form"),
-  },
-  {
-    id: "wechat",
-    title: "微信登录",
-    iconType: "simple",
-    iconName: "WeChat",
-    iconColor: "#07C160",
-    onPress: handleWechatLogin,
   },
   {
     id: "qq",

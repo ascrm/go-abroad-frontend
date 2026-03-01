@@ -14,10 +14,17 @@
       "infoPlist": {
         "LSApplicationQueriesSchemes": [
           "weixin",
-          "wechat",
-          "mqqopensdkapiV3",
-          "mqqopensdkapiV2"
-        ]
+          "wechat"
+        ],
+        "CFBundleURLTypes": [
+          {
+            "CFBundleTypeRole": "Editor",
+            "CFBundleURLSchemes": [
+              "goabroad"
+            ]
+          }
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -31,12 +38,24 @@
         {
           "action": "VIEW",
           "data": [
-            { "scheme": "wechat" },
-            { "scheme": "mqq" }
+            {
+              "scheme": "wechat"
+            },
+            {
+              "scheme": "mqq"
+            }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
-      ]
+      ],
+      "config": {
+        "qq": {
+          "appId": "102877434"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/images/logo.png"
@@ -51,6 +70,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "34da926c-e5f8-4d85-9971-9ee5693d9554"
+      }
     }
   }
 }

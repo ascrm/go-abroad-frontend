@@ -20,7 +20,7 @@ const registerMethods: {
     iconType: "lucide",
     icon: Mail,
     iconColor: "#0076D6",
-    onPress: () => console.log("手机注册"),
+    onPress: () => router.push("/(auth)/register-form"),
   },
   {
     id: "google",

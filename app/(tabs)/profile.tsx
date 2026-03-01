@@ -2,11 +2,9 @@ import { Bell, Bookmark, FileText, Folder, Search, Settings, User } from "lucide
 import { useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { SettingsModal } from "../../components/page/profile/SettingsModal";
+import { router } from "expo-router";
 
 export default function ProfileScreen() {
-  const [isSettingsVisible, setIsSettingsVisible] = useState(false);
-
   // Mock Data for Content
   const historyItems = [
     { id: 1, title: "英国留学签证办理指南", author: "官方发布", views: "1.2k" },
@@ -35,7 +33,7 @@ export default function ProfileScreen() {
           <TouchableOpacity className="p-2">
             <Search size={24} color="#4B5563" />
           </TouchableOpacity>
-          <TouchableOpacity className="p-2" onPress={() => setIsSettingsVisible(true)}>
+          <TouchableOpacity className="p-2" onPress={() => router.push("/(profile)/settings")}>
             <Settings size={24} color="#4B5563" />
           </TouchableOpacity>
         </View>
@@ -134,11 +132,6 @@ export default function ProfileScreen() {
 
       </ScrollView>
 
-      {/* Settings Modal */}
-      <SettingsModal 
-        visible={isSettingsVisible} 
-        onClose={() => setIsSettingsVisible(false)} 
-      />
     </SafeAreaView>
   );
 }
