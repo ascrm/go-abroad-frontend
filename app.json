@@ -20,7 +20,8 @@
           {
             "CFBundleTypeRole": "Editor",
             "CFBundleURLSchemes": [
-              "goabroad"
+              "goabroad",
+              "com.googleusercontent.apps.1011160250394-asqjvtnanpgvcaanv3ncv8kib0fl0vbi"
             ]
           }
         ],

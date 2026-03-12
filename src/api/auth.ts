@@ -4,27 +4,27 @@ import client from './client';
 
 export const authApi = {
   // 账号密码登录
-  login: (data: LoginParams): Promise<ApiResponse<LoginResponseData>> => {
+  login: (data: LoginParams): Promise<LoginResponseData> => {
     return client.post(API_ENDPOINTS.auth.login, data);
   },
 
   // 发送验证码
-  sendCode: (data: SendCodeParams): Promise<ApiResponse<SendCodeResponseData>> => {
+  sendCode: (data: SendCodeParams): Promise<SendCodeResponseData> => {
     return client.post(API_ENDPOINTS.auth.sendCode, data);
   },
 
   // 注册
-  register: (data: RegisterParams): Promise<ApiResponse<LoginResponseData>> => {
+  register: (data: RegisterParams): Promise<LoginResponseData> => {
     return client.post(API_ENDPOINTS.auth.register, data);
   },
 
   // 第三方登录
-  socialLogin: (data: SocialLoginParams): Promise<ApiResponse<LoginResponseData>> => {
+  socialLogin: (data: SocialLoginParams): Promise<LoginResponseData> => {
     return client.post(API_ENDPOINTS.auth.socialLogin, data);
   },
 
   // 刷新 Token
-  refreshToken: (refreshToken: string): Promise<ApiResponse<LoginResponseData>> => {
+  refreshToken: (refreshToken: string): Promise<LoginResponseData> => {
     return client.post(
       API_ENDPOINTS.auth.refresh,
       {},

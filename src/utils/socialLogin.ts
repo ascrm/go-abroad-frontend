@@ -108,10 +108,7 @@ export const googleLogin = async (): Promise<SocialLoginResult> => {
     // 动态创建 auth request（不能在 hook 外部使用 useAuthRequest）
     // 这里使用手动构建的方式
     const clientId = Platform.OS === 'ios' ? GOOGLE_CLIENT_ID_IOS : GOOGLE_CLIENT_ID;
-    const redirectUri = makeRedirectUri({
-      scheme: 'goabroad',
-      path: 'oauthredirect',
-    });
+    const redirectUri = "com.googleusercontent.apps.1011160250394-asqjvtnanpgvcaanv3ncv8kib0fl0vbi:/oauthredirect";
 
     // 使用 expo-auth-session 的发现配置
     const discoveryConfig = discovery;
@@ -122,7 +119,8 @@ export const googleLogin = async (): Promise<SocialLoginResult> => {
       `redirect_uri=${encodeURIComponent(redirectUri)}&` +
       `response_type=code&` +
       `scope=${encodeURIComponent('openid profile email')}&` +
-      `access_type=offline`;
+      `access_type=offline&` +
+      `prompt=select_account`; // 加上这一行
 
     // 使用 expo-web-browser 打开授权页面
     const { type, url } = await require('expo-web-browser').openAuthSessionAsync(

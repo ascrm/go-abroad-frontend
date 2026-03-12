@@ -21,53 +21,35 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
 
   login: async (account, password) => {
-    const res = await authApi.login({ account, password });
+    const { accessToken, refreshToken, user } = (await authApi.login({ account, password }));
     
-    if (res.code === 20000) {
-      const { accessToken, refreshToken, user } = res.data;
-      
-      // 保存到本地存储
-      await storage.setAccessToken(accessToken);
-      await storage.setRefreshToken(refreshToken);
-      await storage.setUser(JSON.stringify(user));
-      
-      set({ user, isAuthenticated: true });
-    } else {
-      throw new Error(res.msg || '登录失败');
-    }
+    // 保存到本地存储
+    await storage.setAccessToken(accessToken);
+    await storage.setRefreshToken(refreshToken);
+    await storage.setUser(JSON.stringify(user));
+    
+    set({ user, isAuthenticated: true });
   },
 
   register: async (account, password, code, accountType) => {
-    const res = await authApi.register({ account, password, code, accountType });
+    const { accessToken, refreshToken, user } = (await authApi.register({ account, password, code, accountType }));
     
-    if (res.code === 20000) {
-      const { accessToken, refreshToken, user } = res.data;
-      
-      // 保存到本地存储
-      await storage.setAccessToken(accessToken);
-      await storage.setRefreshToken(refreshToken);
-      await storage.setUser(JSON.stringify(user));
-      
-      set({ user, isAuthenticated: true });
-    } else {
-      throw new Error(res.msg || '注册失败');
-    }
+    // 保存到本地存储
+    await storage.setAccessToken(accessToken);
+    await storage.setRefreshToken(refreshToken);
+    await storage.setUser(JSON.stringify(user));
+    
+    set({ user, isAuthenticated: true });
   },
 
   socialLogin: async (params) => {
-    const res = await authApi.socialLogin(params);
+    const { accessToken, refreshToken, user } = (await authApi.socialLogin(params));
     
-    if (res.code === 20000) {
-      const { accessToken, refreshToken, user } = res.data;
-      
-      await storage.setAccessToken(accessToken);
-      await storage.setRefreshToken(refreshToken);
-      await storage.setUser(JSON.stringify(user));
-      
-      set({ user, isAuthenticated: true });
-    } else {
-      throw new Error(res.msg || '登录失败');
-    }
+    await storage.setAccessToken(accessToken);
+    await storage.setRefreshToken(refreshToken);
+    await storage.setUser(JSON.stringify(user));
+    
+    set({ user, isAuthenticated: true });
   },
 
   logout: async () => {
