@@ -297,6 +297,8 @@ curl -X POST http://localhost:8080/auth/social/register \
 
 ## 5. 第三方登录
 
+前端只需传递平台类型和授权码，后端自动换取 token 并获取用户信息
+
 ### 请求
 
 ```http
@@ -309,14 +311,7 @@ Content-Type: application/json
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | socialType | Integer | 是 | 平台类型：1-微信, 2-QQ, 3-Google, 4-Apple, 5-抖音 |
-| openid | String | 是 | 第三方平台 openid |
-| unionid | String | 否 | 微信/QQ unionid |
-| accessToken | String | 否 | 第三方平台 access_token |
-| refreshToken | String | 否 | 第三方平台 refresh_token |
-| expiresIn | Long | 否 | 令牌过期时间（秒） |
-| nickname | String | 否 | 用户昵称 |
-| avatar | String | 否 | 用户头像 |
-| gender | Integer | 否 | 性别：0-未知, 1-男, 2-女 |
+| code | String | 是 | 授权码（前端从第三方平台获取的一次性 code） |
 
 ### 响应
 
@@ -481,11 +476,8 @@ curl -X POST http://localhost:8080/auth/login \
 curl -X POST http://localhost:8080/auth/social/login \
   -H "Content-Type: application/json" \
   -d '{
-    "socialType": 1,
-    "openid": "oXXXX_XXXXX",
-    "unionid": "uXXXX_XXXXX",
-    "accessToken": "XXXXX",
-    "nickname": "微信用户"
+    "socialType": 3,
+    "code": "授权码"
   }'
 ```
 

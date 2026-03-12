@@ -3,14 +3,15 @@ import { router } from "expo-router";
 import { LucideIcon, Mail } from "lucide-react-native";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuthStore } from "../../src/stores/authStore";
-import { SocialLoginResult, SocialType, appleLogin, googleLogin, qqLogin } from "../../src/utils/socialLogin";
+import { useAuthStore } from "@/src/stores/authStore";
+import { SocialLoginResult, SocialType, appleLogin, googleLogin } from "@/src/utils/socialLogin";
 
 // 通用的社交登录处理函数
 const handleSocialLogin = async (
   loginFn: () => Promise<SocialLoginResult>,
   socialType: SocialType
 ) => {
+    console.log("你无敌了");
   const { socialLogin } = useAuthStore.getState();
 
   try {
@@ -21,17 +22,11 @@ const handleSocialLogin = async (
       return;
     }
 
-    // 调用后端第三方登录接口
+    // 调用后端第三方登录接口（只需传递 socialType 和 code）
+    console.log("你无敌了+++++++++++：", result);
     await socialLogin({
       socialType,
-      openid: result.openid || result.code || '',
-      unionid: result.unionid,
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-      expiresIn: result.expiresIn,
-      nickname: result.nickname,
-      avatar: result.avatar,
-      gender: result.gender,
+      code: result.code || '',
     });
 
     router.replace("/(tabs)/home");

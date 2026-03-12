@@ -63,29 +63,25 @@ export default function RegisterFormScreen() {
 
     try {
       // 调用发送验证码 API
-      const res = await authApi.sendCode({
+      await authApi.sendCode({
         accountType,
         account: identifier.trim(),
         codeType: 1, // 1-注册
       });
 
-      if (res.code === 20000) {
-        // 开始倒计时
-        setCountdown(60);
-        const timer = setInterval(() => {
-          setCountdown((prev) => {
-            if (prev <= 1) {
-              clearInterval(timer);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
+      // 请求成功：开始倒计时
+      setCountdown(60);
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
 
-        Alert.alert("提示", isEmail ? "验证码已发送到邮箱" : "验证码已发送到手机");
-      } else {
-        Alert.alert("发送失败", res.msg || "请稍后重试");
-      }
+      Alert.alert("提示", accountType === 2 ? "验证码已发送到邮箱" : "验证码已发送到手机");
     } catch (error: any) {
       Alert.alert("发送失败", error.message || "请稍后重试");
     }

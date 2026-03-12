@@ -39,14 +39,7 @@ export interface SendCodeResponseData {
 // 第三方登录请求参数
 export interface SocialLoginParams {
   socialType: 1 | 2 | 3 | 4 | 5; // 1-微信, 2-QQ, 3-Google, 4-Apple, 5-抖音
-  openid: string;
-  unionid?: string;
-  accessToken?: string;
-  refreshToken?: string;
-  expiresIn?: number;
-  nickname?: string;
-  avatar?: string;
-  gender?: 0 | 1 | 2;
+  code: string; // 授权码（前端从第三方平台获取的一次性 code）
 }
 
 // 登录响应数据
