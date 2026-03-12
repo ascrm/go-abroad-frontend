@@ -1,10 +1,11 @@
 import CountryPicker from "@/components/page/create-plan/CountryPicker";
+import GenerateResult from "@/components/page/create-plan/GenerateResult";
 import { router } from "expo-router";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react-native";
 import { useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import SelectAbroadType from "../components/page/create-plan/SelectAbroadType";
+import SelectAbroadType from "../../components/page/create-plan/SelectAbroadType";
 
 type AbroadType = "tourism" | "study" | "work" | "immigration" | null;
 
@@ -141,18 +142,11 @@ export default function CreatePlanScreen() {
 
   const handleGenerate = () => {
     setIsGenerating(true);
-    setTimeout(() => {
-      Alert.alert(
-        "生成成功",
-        "您的出国规划已生成完毕",
-        [
-          {
-            text: "确定",
-            onPress: () => router.back(),
-          },
-        ]
-      );
-    }, 3000);
+  };
+
+  const handleGenerateComplete = () => {
+    setIsGenerating(false);
+    router.back();
   };
 
   const updateField = (value: string) => {
@@ -288,15 +282,7 @@ export default function CreatePlanScreen() {
   };
 
   if (isGenerating) {
-    return (
-      <SafeAreaView edges={['top']} className="flex-1 bg-gray-50 items-center justify-center">
-        <View className="w-20 h-20 bg-gray-100 rounded-full items-center justify-center mb-6">
-          <Sparkles size={36} color="#0076D6" />
-        </View>
-        <Text className="text-xl font-semibold text-gray-900 mb-2">AI正在生成规划</Text>
-        <Text className="text-sm text-gray-500">请稍候...</Text>
-      </SafeAreaView>
-    );
+    return <GenerateResult onComplete={handleGenerateComplete} />;
   }
 
   return (
