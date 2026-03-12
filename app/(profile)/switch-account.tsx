@@ -56,7 +56,7 @@ export default function SwitchAccountScreen() {
             } finally {
               // 清除本地存储的登录状态
               await logout();
-              router.replace("/(auth)/login");
+              router.replace("/(auth)/welcome");
             }
           },
         },

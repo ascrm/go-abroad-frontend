@@ -1,4 +1,3 @@
-import { useAuthStore } from "@/src/stores/authStore";
 import { router } from "expo-router";
 import { Bell, HelpCircle, Info, Lock, Moon, Users, X } from "lucide-react-native";
 import React from "react";
@@ -43,8 +42,6 @@ export default function SettingsScreen() {
   const [isNotificationOn, setIsNotificationOn] = React.useState(true);
   const [isDarkMode, setIsDarkMode] = React.useState(false);
   
-  const { user } = useAuthStore();
-
   const handleSwitchAccount = () => {
     router.push("/(profile)/switch-account");
   };
@@ -81,15 +78,7 @@ export default function SettingsScreen() {
         
         <View style={styles.divider} />
 
-        {/* 切换账号 - 仅登录后显示 */}
-        {user && (
-          <SettingsItem 
-            icon={Users} 
-            label="切换账号" 
-            onPress={handleSwitchAccount}
-          />
-        )}
-        
+        <SettingsItem icon={Users} label="切换账号" onPress={handleSwitchAccount}/>
         <SettingsItem icon={Lock} label="隐私政策" />
         <SettingsItem icon={HelpCircle} label="帮助中心" />
         <SettingsItem icon={Info} label="关于我们" />
