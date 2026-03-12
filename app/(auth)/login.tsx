@@ -1,17 +1,16 @@
+import { useAuthStore } from "@/src/stores/authStore";
+import { SocialLoginResult, SocialType, googleLogin } from "@/src/utils/socialLogin";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { LucideIcon, Mail } from "lucide-react-native";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuthStore } from "@/src/stores/authStore";
-import { SocialLoginResult, SocialType, appleLogin, googleLogin } from "@/src/utils/socialLogin";
 
 // 通用的社交登录处理函数
 const handleSocialLogin = async (
   loginFn: () => Promise<SocialLoginResult>,
   socialType: SocialType
 ) => {
-    console.log("你无敌了");
   const { socialLogin } = useAuthStore.getState();
 
   try {
@@ -23,7 +22,6 @@ const handleSocialLogin = async (
     }
 
     // 调用后端第三方登录接口（只需传递 socialType 和 code）
-    console.log("你无敌了+++++++++++：", result);
     await socialLogin({
       socialType,
       code: result.code || '',
@@ -39,7 +37,16 @@ const handleSocialLogin = async (
 const handleQQLogin = () => {
   Alert.alert(
     'iOS QQ 登录暂不支持',
-    '开通条件（满足任意一项）：\n1. iOS 开发者账号（$99/年）\n2. Mac 电脑',
+    '实现条件（满足任意一项）：\n1. iOS 开发者账号（$99/年）\n2. Mac 电脑',
+    [{ text: '知道了' }]
+  );
+};
+
+// 微信登录处理（需要企业资质）
+const handleWechatLogin = () => {
+  Alert.alert(
+    '微信登录暂不支持',
+    '需要拥有企业资质，个人开发者无法实现',
     [{ text: '知道了' }]
   );
 };
@@ -47,8 +54,14 @@ const handleQQLogin = () => {
 // Google 登录处理
 const handleGoogleLogin = () => handleSocialLogin(googleLogin, SocialType.Google);
 
-// Apple 登录处理
-const handleAppleLogin = () => handleSocialLogin(appleLogin, SocialType.Apple);
+// Apple 登录处理（需要 iOS 开发者账号）
+const handleAppleLogin = () => {
+  Alert.alert(
+    'Apple 登录暂不支持',
+    '需要注册 iOS 个人开发者账号（$99/年）',
+    [{ text: '知道了' }]
+  );
+};
 
 // 登录方式数据
 const loginMethods: {
@@ -69,16 +82,8 @@ const loginMethods: {
     onPress: () => router.push("/(auth)/login-form"),
   },
   {
-    id: "qq",
-    title: "QQ登录",
-    iconType: "simple",
-    iconName: "QQ",
-    iconColor: "#12B7F5",
-    onPress: handleQQLogin,
-  },
-  {
     id: "google",
-    title: "Google登录",
+    title: "Google 登录",
     iconType: "simple",
     iconName: "Google",
     iconColor: "#EA4335",
@@ -86,11 +91,32 @@ const loginMethods: {
   },
   {
     id: "apple",
-    title: "Apple登录",
+    title: "Apple 登录",
     iconType: "simple",
     iconName: "Apple",
     iconColor: "#000000",
     onPress: handleAppleLogin,
+  },
+];
+
+// 底部其他登录方式（仅图标）
+const otherLoginMethods: {
+  id: string;
+  iconName: string;
+  iconColor: string;
+  onPress: () => void;
+}[] = [
+  {
+    id: "qq",
+    iconName: "QQ",
+    iconColor: "#12B7F5",
+    onPress: handleQQLogin,
+  },
+  {
+    id: "wechat",
+    iconName: "Wechat",
+    iconColor: "#07C160",
+    onPress: handleWechatLogin,
   },
 ];
 
@@ -147,8 +173,29 @@ export default function LoginScreen() {
           ))}
         </View>
 
+        {/* 其他登录方式（仅图标） */}
+        <View className="mt-10">
+          <Text className="text-center text-gray-400 text-sm mb-4">其他登录方式</Text>
+          <View className="flex-row justify-center gap-8">
+            {otherLoginMethods.map((method) => (
+              <TouchableOpacity
+                key={method.id}
+                className="w-12 h-12 bg-white rounded-full items-center justify-center"
+                onPress={method.onPress}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={{ uri: `https://cdn.simpleicons.org/${method.iconName}/${method.iconColor.replace('#', '')}` }}
+                  style={{ width: 28, height: 28 }}
+                  contentFit="contain"
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
         {/* 注册提示 */}
-        <View className="mt-8 items-center">
+        <View className="mt-64 items-center">
           <Text className="text-gray-500 text-sm">尚未拥有账号？</Text>
           <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
             <Text className="text-blue-500 text-sm font-medium mt-1">注册</Text>

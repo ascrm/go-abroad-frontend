@@ -1,10 +1,11 @@
 import { authApi } from "@/src/api/auth";
 import { useAuthStore } from "@/src/stores/authStore";
 import { User as UserType } from "@/src/types/auth";
+import { Image } from "expo-image";
 import { router } from "expo-router";
-import { CheckCheck, LogOut, User, UserRoundPlus, X } from "lucide-react-native";
+import { CheckCheck, LogOut, UserRoundPlus, X } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
-import { Alert, Image, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 // 历史账号信息
 interface AccountItem {
@@ -92,16 +93,10 @@ export default function SwitchAccountScreen() {
           >
             {/* 头像 */}
             <View style={styles.avatarContainer}>
-              {item.user.avatar ? (
-                <Image
+              <Image
                   source={{ uri: item.user.avatar }}
                   style={styles.avatar}
                 />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <User size={32} color="#9CA3AF" />
-                </View>
-              )}
             </View>
 
             {/* 用户信息 */}

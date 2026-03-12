@@ -1,10 +1,28 @@
-import { Bell, Bookmark, FileText, Folder, Search, Settings, User } from "lucide-react-native";
-import { useState } from "react";
+import { User as UserType } from "@/src/types/auth";
+import { storage } from "@/src/utils/storage";
+import { Image } from "expo-image";
+import { router } from "expo-router";
+import { Bell, Bookmark, FileText, Folder, Search, Settings } from "lucide-react-native";
+import { useEffect, useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
 
 export default function ProfileScreen() {
+  const [user, setUser] = useState<UserType | null>(null);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      const userStr = await storage.getUser();
+      if (userStr) {
+        try {
+          const userData = JSON.parse(userStr) as UserType;
+          setUser(userData);
+        } catch {}
+      }
+    };
+    loadUser();
+  }, []);
+
   // Mock Data for Content
   const historyItems = [
     { id: 1, title: "英国留学签证办理指南", author: "官方发布", views: "1.2k" },
@@ -45,15 +63,20 @@ export default function ProfileScreen() {
         <View className="bg-white px-6 pb-8 pt-2 z-10">
           <View className="flex-row items-center mb-4">
             <View className="w-24 h-24 rounded-full border border-gray-200 bg-gray-200 overflow-hidden mr-5">
-              {/* Avatar Placeholder */}
-              <View className="w-full h-full bg-gray-300 items-center justify-center">
-                <User size={40} color="#6B7280" />
-              </View>
+              <Image
+                source={{ uri: user?.avatar || "https://api.dicebear.com/7.x/avataaars/png?seed=default" }}
+                style={{ width: '100%', height: '100%' }} // 强制指定宽高
+                contentFit="cover"
+              />
             </View>
-            
+
             <View className="flex-1 justify-center">
-              <Text className="text-2xl font-bold text-gray-900">未登录用户</Text>
-              <Text className="text-gray-500 mt-1">@guest_user</Text>
+              <Text className="text-2xl font-bold text-gray-900">
+                {user?.nickname || "未登录用户"}
+              </Text>
+              <Text className="text-gray-500 mt-1">
+                @{user?.username || "guest_user"}
+              </Text>
             </View>
           </View>
         </View>
