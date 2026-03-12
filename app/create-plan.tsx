@@ -289,7 +289,7 @@ export default function CreatePlanScreen() {
 
   if (isGenerating) {
     return (
-      <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
+      <SafeAreaView edges={['top']} className="flex-1 bg-gray-50 items-center justify-center">
         <View className="w-20 h-20 bg-gray-100 rounded-full items-center justify-center mb-6">
           <Sparkles size={36} color="#0076D6" />
         </View>
@@ -301,7 +301,7 @@ export default function CreatePlanScreen() {
 
   return (
     <>
-      <SafeAreaView className="flex-1 bg-gray-50">
+      <SafeAreaView edges={['top']} className="flex-1 bg-gray-50">
         {abroadType ? (
           <>
             {/* 顶部进度条 */}

@@ -40,7 +40,7 @@ export default function ProfileScreen() {
   ];
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView edges={['top']} className="flex-1 bg-white">
       
       {/* 1. Fixed Header */}
       <View className="bg-white px-4 py-3 z-20">
