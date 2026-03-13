@@ -1,5 +1,6 @@
 import OptionsMenu from "@/components/page/home/OptionsMenu";
 import { Image } from "expo-image";
+import { router } from "expo-router";
 import { Bookmark, ChartNoAxesColumn, Ellipsis, MessageCircle, Search, Sparkles } from "lucide-react-native";
 import { useRef, useState } from "react";
 import { Dimensions, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
@@ -176,7 +177,22 @@ export default function HomeScreen() {
           {activeTab === "recommend" ? (
             <View className="gap-6">
               {/* 大卡片 - 第一条 */}
-              <TouchableOpacity className="bg-white rounded-2xl overflow-hidden">
+              <TouchableOpacity 
+                className="bg-white rounded-2xl overflow-hidden"
+                onPress={() => router.push({
+                  pathname: "/(home)/article-detail",
+                  params: { 
+                    id: recommendData[0].id,
+                    title: recommendData[0].title,
+                    description: recommendData[0].description,
+                    tag: recommendData[0].tag,
+                    date: recommendData[0].date,
+                    image: recommendData[0].image,
+                    views: recommendData[0].views,
+                    favorites: recommendData[0].favorites
+                  }
+                })}
+              >
                 <Image
                   source={{ uri: recommendData[0].image }}
                   style={{ width: '100%', height: 180 }}
@@ -225,7 +241,23 @@ export default function HomeScreen() {
 
               {/* 小卡片 - 剩余条目 */}
               {recommendData.slice(1).map((item) => (
-                <TouchableOpacity key={item.id} className="bg-white rounded-2xl overflow-hidden">
+                <TouchableOpacity 
+                  key={item.id} 
+                  className="bg-white rounded-2xl overflow-hidden"
+                  onPress={() => router.push({
+                    pathname: "/(home)/article-detail",
+                    params: { 
+                      id: item.id,
+                      title: item.title,
+                      description: item.description,
+                      tag: item.tag,
+                      date: item.date,
+                      image: item.image,
+                      views: item.views,
+                      favorites: item.favorites
+                    }
+                  })}
+                >
                   <View className="flex-row p-4">
                     <View className="flex-1">
                       <View className="flex-row items-center gap-2 mb-2">
@@ -280,7 +312,23 @@ export default function HomeScreen() {
             // 问答内容
             <View className="gap-3">
               {qaData.map((item) => (
-                <TouchableOpacity key={item.id} className="bg-white rounded-2xl p-5">
+                <TouchableOpacity 
+                  key={item.id} 
+                  className="bg-white rounded-2xl p-5"
+                  onPress={() => router.push({
+                    pathname: "/(home)/qa-detail",
+                    params: { 
+                      id: item.id,
+                      title: item.title,
+                      author: item.author,
+                      avatar: item.avatar,
+                      category: item.category,
+                      replies: item.replies,
+                      views: item.views,
+                      date: item.date
+                    }
+                  })}
+                >
                   {/* 右上角更多按钮 */}
                   <TouchableOpacity 
                     className="absolute top-4 right-4"
