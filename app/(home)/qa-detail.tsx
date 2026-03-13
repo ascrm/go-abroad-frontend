@@ -1,62 +1,137 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { Bookmark, BookmarkCheck, ChartNoAxesColumn, ChevronLeft, MessageCircle, MoreHorizontal, Send, Share2, ThumbsUp } from "lucide-react-native";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as homeApi from "@/src/api/home";
+import type { Question, Answer } from "@/src/types/home";
+import { formatRelativeTime } from "@/src/utils/time";
 
 export default function QADetailScreen() {
-  const { id, title, author, avatar, category, replies, views, date } = useLocalSearchParams<{
-    id: string;
-    title: string;
-    author: string;
-    avatar: string;
-    category: string;
-    replies: string;
-    views: string;
-    date: string;
-  }>();
-
-  const [liked, setLiked] = useState(false);
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const [question, setQuestion] = useState<Question | null>(null);
+  const [answers, setAnswers] = useState<Answer[]>([]);
+  const [likedAnswers, setLikedAnswers] = useState<Record<number, boolean>>({});
   const [isFavorite, setIsFavorite] = useState(false);
-  const [likeCount, setLikeCount] = useState(23);
   const [replyText, setReplyText] = useState("");
   const [showReplyInput, setShowReplyInput] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // 模拟回答数据
-  const answers = [
-    {
-      id: "1",
-      author: "留学顾问王老师",
-      avatar: "王",
-      isOfficial: true,
-      content: "申请英国研究生需要准备以下材料：\n\n1. **学术材料**\n- 本科成绩单（需要学校盖章的英文版）\n- 在读证明/毕业证书\n- 学位证书（如已毕业）\n\n2. **语言成绩**\n- 雅思或托福成绩（建议雅思6.5分以上，托福92分以上）\n\n3. **文书材料**\n- 个人陈述（Personal Statement）\n- 两封推荐信\n- 简历（CV）\n\n4. **其他材料**\n- 护照复印件\n- 资金证明\n- 作品集（部分专业需要）\n\n建议提前6-9个月开始准备，祝申请顺利！",
-      likes: 45,
-      date: "30分钟前",
-      replies: 2,
-    },
-    {
-      id: "2",
-      author: "英国留学生小李",
-      avatar: "李",
-      isOfficial: false,
-      content: "补充一下我当时的经验：\n\n1. 成绩单一定要提前翻译好，有的学校可以提供英文版，有的需要自己找翻译机构\n\n2. 推荐信建议提前2个月联系老师，让老师有足够时间准备\n\n3. 个人陈述要突出自己的独特优势，不要泛泛而谈\n\n4. 记得关注各学校的申请截止日期，不要错过！",
-      likes: 18,
-      date: "1小时前",
-      replies: 1,
-    },
-  ];
+  // 加载问题详情和回答列表
+  const loadData = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    try {
+      // 并行加载问题和回答
+      const [questionData, answersData] = await Promise.all([
+        homeApi.getQuestionDetail(Number(id)),
+        homeApi.getAnswerList({ questionId: Number(id), pageSize: 20 }),
+      ]);
+      setQuestion(questionData);
+      setAnswers(answersData.list);
+      setIsFavorite(questionData.isFavorited || false);
 
-  const handleLike = () => {
-    setLiked(!liked);
-    setLikeCount(liked ? likeCount - 1 : likeCount + 1);
-  };
+      // 初始化点赞状态
+      const likeState: Record<number, boolean> = {};
+      answersData.list.forEach((answer) => {
+        likeState[answer.id] = answer.isLiked || false;
+      });
+      setLikedAnswers(likeState);
+    } catch (error) {
+      console.error("加载问答详情失败:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
 
-  const handleReply = () => {
-    if (replyText.trim()) {
-      setReplyText("");
-      setShowReplyInput(false);
+  // 首次加载
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // 记录浏览
+  useEffect(() => {
+    if (question) {
+      homeApi.recordView({
+        targetId: question.id,
+        targetType: "question",
+        action: "view",
+      }).catch(console.error);
+    }
+  }, [question]);
+
+  // 切换收藏
+  const handleToggleFavorite = async () => {
+    if (!question) return;
+    const currentState = isFavorite;
+    setIsFavorite(!currentState);
+
+    try {
+      await homeApi.toggleFavorite({
+        targetId: question.id,
+        targetType: "question",
+        action: "favorite",
+      });
+    } catch (error) {
+      setIsFavorite(currentState);
+      console.error("收藏操作失败:", error);
     }
   };
+
+  // 切换点赞
+  const handleToggleLike = async (answerId: number) => {
+    const currentState = likedAnswers[answerId] || false;
+    setLikedAnswers((prev) => ({
+      ...prev,
+      [answerId]: !currentState,
+    }));
+
+    try {
+      await homeApi.toggleLike({
+        targetId: answerId,
+        targetType: "answer",
+        action: "like",
+      });
+    } catch (error) {
+      setLikedAnswers((prev) => ({
+        ...prev,
+        [answerId]: currentState,
+      }));
+      console.error("点赞操作失败:", error);
+    }
+  };
+
+  // 提交回答
+  const handleReply = async () => {
+    if (!replyText.trim() || !question) return;
+
+    try {
+      const newAnswer = await homeApi.createAnswer({
+        questionId: question.id,
+        content: replyText.trim(),
+      });
+      setAnswers((prev) => [newAnswer, ...prev]);
+      setReplyText("");
+      setShowReplyInput(false);
+    } catch (error) {
+      console.error("提交回答失败:", error);
+    }
+  };
+
+  if (loading || !question) {
+    return (
+      <SafeAreaView edges={['top']} className="flex-1 bg-gray-50">
+        <View className="px-4 py-3 flex-row items-center">
+          <TouchableOpacity onPress={() => router.back()} className="p-1">
+            <ChevronLeft size={24} color="#374151" />
+          </TouchableOpacity>
+        </View>
+        <View className="flex-1 items-center justify-center">
+          <Text className="text-gray-400">加载中...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-gray-50">
@@ -66,8 +141,8 @@ export default function QADetailScreen() {
           <ChevronLeft size={24} color="#374151" />
         </TouchableOpacity>
         <View className="flex-row items-center gap-4">
-          <TouchableOpacity 
-            onPress={() => setIsFavorite(!isFavorite)}
+          <TouchableOpacity
+            onPress={handleToggleFavorite}
             className="p-1"
           >
             {isFavorite ? (
@@ -91,32 +166,40 @@ export default function QADetailScreen() {
             <View className="flex-row items-center justify-between mb-3">
               <View className="flex-row items-center gap-2">
                 <View className="w-10 h-10 bg-gray-100 rounded-full items-center justify-center">
-                  <Text className="text-base text-gray-600 font-medium">{avatar}</Text>
+                  <Text className="text-base text-gray-600 font-medium">
+                    {question.author?.nickname?.charAt(0) || "用"}
+                  </Text>
                 </View>
                 <View>
-                  <Text className="text-sm font-medium text-gray-900">{author}</Text>
-                  <Text className="text-xs text-gray-400">{date}</Text>
+                  <Text className="text-sm font-medium text-gray-900">
+                    {question.author?.nickname || "未知用户"}
+                  </Text>
+                  <Text className="text-xs text-gray-400">
+                    {formatRelativeTime(question.createdAt)}
+                  </Text>
                 </View>
               </View>
-              <View className="bg-orange-50 px-2 py-1 rounded-md">
-                <Text className="text-xs font-medium text-orange-600">{category}</Text>
-              </View>
+              {question.category && (
+                <View className="bg-orange-50 px-2 py-1 rounded-md">
+                  <Text className="text-xs font-medium text-orange-600">{question.category}</Text>
+                </View>
+              )}
             </View>
-            
+
             {/* 问题标题 */}
             <Text className="text-xl font-bold text-gray-900 leading-tight mb-4">
-              {title}
+              {question.title}
             </Text>
-            
+
             {/* 统计数据 */}
             <View className="flex-row items-center gap-4">
               <View className="flex-row items-center gap-1">
                 <MessageCircle size={16} color="#9CA3AF" />
-                <Text className="text-sm text-gray-400">{replies}</Text>
+                <Text className="text-sm text-gray-400">{question.repliesCount}</Text>
               </View>
               <View className="flex-row items-center gap-1">
                 <ChartNoAxesColumn size={16} color="#9CA3AF" />
-                <Text className="text-sm text-gray-400">{views}</Text>
+                <Text className="text-sm text-gray-400">{question.views}</Text>
               </View>
             </View>
           </View>
@@ -130,69 +213,78 @@ export default function QADetailScreen() {
               {answers.length} 个回答
             </Text>
 
-          <View className="gap-6">
-            {answers.map((answer) => (
-              <View key={answer.id}>
-                {/* 回答者信息 */}
-                <View className="flex-row items-center justify-between mb-3">
-                  <View className="flex-row items-center gap-3">
-                    <View className={`w-10 h-10 rounded-full items-center justify-center ${
-                      answer.isOfficial ? "bg-blue-100" : "bg-gray-100"
-                    }`}>
-                      <Text className={`text-base font-medium ${
-                        answer.isOfficial ? "text-blue-600" : "text-gray-600"
-                      }`}>{answer.avatar}</Text>
-                    </View>
-                    <View>
-                      <View className="flex-row items-center gap-2">
-                        <Text className="text-base font-medium text-gray-900">{answer.author}</Text>
-                        {answer.isOfficial && (
-                          <View className="bg-blue-50 px-1.5 py-0.5 rounded">
-                            <Text className="text-xs text-blue-600">官方</Text>
-                          </View>
-                        )}
+            <View className="gap-6">
+              {answers.map((answer) => (
+                <View key={answer.id}>
+                  {/* 回答者信息 */}
+                  <View className="flex-row items-center justify-between mb-3">
+                    <View className="flex-row items-center gap-3">
+                      <View className={`w-10 h-10 rounded-full items-center justify-center ${
+                        answer.isOfficial ? "bg-blue-100" : "bg-gray-100"
+                      }`}>
+                        <Text className={`text-base font-medium ${
+                          answer.isOfficial ? "text-blue-600" : "text-gray-600"
+                        }`}>
+                          {answer.author?.nickname?.charAt(0) || "用"}
+                        </Text>
                       </View>
-                      <Text className="text-xs text-gray-400">{answer.date}</Text>
+                      <View>
+                        <View className="flex-row items-center gap-2">
+                          <Text className="text-base font-medium text-gray-900">
+                            {answer.author?.nickname || "未知用户"}
+                          </Text>
+                          {answer.isOfficial && (
+                            <View className="bg-blue-50 px-1.5 py-0.5 rounded">
+                              <Text className="text-xs text-blue-600">官方</Text>
+                            </View>
+                          )}
+                          {answer.isBestAnswer && (
+                            <View className="bg-green-50 px-1.5 py-0.5 rounded">
+                              <Text className="text-xs text-green-600">最佳</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text className="text-xs text-gray-400">
+                          {formatRelativeTime(answer.createdAt)}
+                        </Text>
+                      </View>
                     </View>
+                    <TouchableOpacity>
+                      <MoreHorizontal size={18} color="#9CA3AF" />
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity>
-                    <MoreHorizontal size={18} color="#9CA3AF" />
-                  </TouchableOpacity>
+
+                  {/* 回答内容 */}
+                  <Text className="text-base text-gray-700 leading-7 mb-4 whitespace-pre-line">
+                    {answer.content}
+                  </Text>
+
+                  {/* 点赞和回复 */}
+                  <View className="flex-row items-center gap-6">
+                    <TouchableOpacity
+                      className="flex-row items-center gap-1"
+                      onPress={() => handleToggleLike(answer.id)}
+                    >
+                      <ThumbsUp
+                        size={16}
+                        color={likedAnswers[answer.id] ? "#3B82F6" : "#9CA3AF"}
+                        fill={likedAnswers[answer.id] ? "#3B82F6" : "none"}
+                      />
+                      <Text className={`text-sm ${likedAnswers[answer.id] ? "text-blue-600" : "text-gray-400"}`}>
+                        {answer.likes}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity className="flex-row items-center gap-1">
+                      <MessageCircle size={16} color="#9CA3AF" />
+                      <Text className="text-sm text-gray-400">{answer.repliesCount} 回复</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* 分割线 */}
+                  <View className="h-px bg-gray-100 mt-5" />
                 </View>
-
-                {/* 回答内容 */}
-                <Text className="text-base text-gray-700 leading-7 mb-4 whitespace-pre-line">
-                  {answer.content}
-                </Text>
-
-                {/* 点赞和回复 */}
-                <View className="flex-row items-center gap-6">
-                  <TouchableOpacity 
-                    className="flex-row items-center gap-1"
-                    onPress={() => {
-                      // 点赞逻辑
-                    }}
-                  >
-                    <ThumbsUp 
-                      size={16} 
-                      color={answer.likes > 0 ? "#3B82F6" : "#9CA3AF"} 
-                      fill={answer.likes > 0 ? "#3B82F6" : "none"}
-                    />
-                    <Text className={`text-sm ${answer.likes > 0 ? "text-blue-600" : "text-gray-400"}`}>
-                      {answer.likes}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity className="flex-row items-center gap-1">
-                    <MessageCircle size={16} color="#9CA3AF" />
-                    <Text className="text-sm text-gray-400">{answer.replies} 回复</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* 分割线 */}
-                <View className="h-px bg-gray-100 mt-5" />
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
           </View>
         </View>
         {/* 底部空隙 */}
@@ -211,7 +303,7 @@ export default function QADetailScreen() {
               onChangeText={setReplyText}
               multiline
             />
-            <TouchableOpacity 
+            <TouchableOpacity
               className="w-10 h-10 bg-blue-600 rounded-full items-center justify-center"
               onPress={handleReply}
             >
@@ -219,7 +311,7 @@ export default function QADetailScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity 
+          <TouchableOpacity
             className="bg-gray-100 rounded-full px-4 py-3"
             onPress={() => setShowReplyInput(true)}
           >
