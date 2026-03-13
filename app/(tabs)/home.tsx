@@ -1,6 +1,6 @@
 import * as homeApi from "@/src/api/home";
 import OptionsMenu from "@/components/page/home/OptionsMenu";
-import type { Article, Question } from "@/src/types";
+import type { Article, Question } from "@/src/types/home";
 import { formatRelativeTime } from "@/src/utils/time";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -137,16 +137,9 @@ export default function HomeScreen() {
           contentFit="cover"
         />
       )}
-      <View className={`${isLarge ? 'px-5 pt-5 pb-3' : 'p-4'}`}>
-        {!isLarge && article.image && (
-          <Image
-            source={{ uri: article.image }}
-            className="ml-3"
-            style={{ width: 96, height: 96, borderRadius: 12 }}
-            contentFit="cover"
-          />
-        )}
-        <View className={isLarge ? '' : 'flex-1'}>
+      {isLarge ? (
+        // 大卡片布局
+        <View className="px-5 pt-5 pb-3">
           <View className="flex-row items-center gap-2 mb-2">
             {article.tag && (
               <View className="bg-blue-50 px-2 py-1 rounded-md">
@@ -166,7 +159,38 @@ export default function HomeScreen() {
             </Text>
           )}
         </View>
-      </View>
+      ) : (
+        // 小卡片布局：左侧文字，右侧图片
+        <View className="flex-row p-4">
+          <View className="flex-1">
+            <View className="flex-row items-center gap-2 mb-2">
+              {article.tag && (
+                <View className="bg-blue-50 px-2 py-1 rounded-md">
+                  <Text className="text-xs font-medium text-blue-600">{article.tag}</Text>
+                </View>
+              )}
+              <Text className="text-xs text-gray-400">
+                {formatRelativeTime(article.createdAt)}
+              </Text>
+            </View>
+            <Text className="text-base font-semibold text-gray-900 leading-tight mb-1">
+              {article.title}
+            </Text>
+            {article.description && (
+              <Text className="text-sm text-gray-500" numberOfLines={2}>
+                {article.description}
+              </Text>
+            )}
+          </View>
+          {article.image && (
+            <Image
+              source={{ uri: article.image }}
+              style={{ width: 96, height: 96, borderRadius: 12 }}
+              contentFit="cover"
+            />
+          )}
+        </View>
+      )}
       <View className={`flex-row justify-between items-center ${isLarge ? 'px-5 pb-3' : 'px-5 pb-3'}`}>
         <View className="flex-row items-center gap-4">
           <TouchableOpacity
