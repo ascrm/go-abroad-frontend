@@ -38,4 +38,33 @@ export const API_ENDPOINTS = {
     taskReorder: '/task', // {phaseId}/tasks/reorder
     taskAISuggestion: '/task', // {taskId}/ai-suggestion
   },
+  home: {
+    // 文章
+    articleList: '/home/article/list',
+    articleDetail: '/home/article',
+    articleCreate: '/home/article',
+    articleUpdate: '/home/article',
+    articleDelete: '/home/article',
+
+    // 问答-问题
+    questionList: '/home/question/list',
+    questionDetail: '/home/question',
+    questionCreate: '/home/question',
+    questionUpdate: '/home/question',
+    questionDelete: '/home/question',
+
+    // 问答-回答
+    answerList: '/home/answer/list',
+    answerDetail: '/home/answer',
+    answerCreate: '/home/answer',
+    answerUpdate: '/home/answer',
+    answerDelete: '/home/answer',
+
+    // 互动（收藏、点赞、关注、浏览）
+    favorite: '/home/interaction/favorite',
+    like: '/home/interaction/like',
+    follow: '/home/interaction/follow',
+    view: '/home/interaction/view',
+    checkInteraction: '/home/interaction/check',
+  },
 };
