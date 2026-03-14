@@ -1,14 +1,6 @@
 import { Clock, MapPin, MoreVertical, Plane, GraduationCap, Briefcase, Home } from "lucide-react-native";
 import { Text, TouchableOpacity, View } from "react-native";
-
-interface Plan {
-  id: string;
-  type: "tourism" | "study" | "work" | "immigration";
-  destination: string;
-  title: string;
-  createdAt: string;
-  status: "generating" | "completed";
-}
+import type { Plan, PlanType } from "@/types/plan";
 
 interface PlanListProps {
   plans: Plan[];
@@ -25,8 +17,9 @@ const typeConfig = {
 
 export default function PlanList({ plans, onPlanPress, onCreatePlan }: PlanListProps) {
   const renderPlanCard = (plan: Plan) => {
-    const config = typeConfig[plan.type];
+    const config = typeConfig[plan.type as PlanType] || typeConfig.tourism;
     const Icon = config.icon;
+    const destinationText = plan.destination.country || plan.destination.city || plan.destination.province || "";
 
     return (
       <TouchableOpacity
@@ -47,7 +40,7 @@ export default function PlanList({ plans, onPlanPress, onCreatePlan }: PlanListP
               <Text className="text-lg font-semibold text-gray-900">{plan.title}</Text>
               <View className="flex-row items-center gap-1 mt-1">
                 <MapPin size={14} color="#9CA3AF" />
-                <Text className="text-sm text-gray-500">{plan.destination}</Text>
+                <Text className="text-sm text-gray-500">{destinationText}</Text>
               </View>
             </View>
           </View>
@@ -73,7 +66,7 @@ export default function PlanList({ plans, onPlanPress, onCreatePlan }: PlanListP
                 color: plan.status === "completed" ? "#16A34A" : "#D97706" 
               }}
             >
-              {plan.status === "completed" ? "已完成" : "生成中"}
+              {plan.status === "completed" ? "已完成" : plan.status === "generating" ? "生成中" : "草稿"}
             </Text>
           </View>
         </View>

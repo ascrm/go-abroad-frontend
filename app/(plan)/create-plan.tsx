@@ -1,23 +1,31 @@
 import CountryPicker from "@/components/page/create-plan/CountryPicker";
 import GenerateResult from "@/components/page/create-plan/GenerateResult";
-import { router } from "expo-router";
-import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react-native";
-import { useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {ChevronLeft, ChevronRight} from "lucide-react-native";
+import {useState} from "react";
+import {ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View} from "react-native";
+import {SafeAreaView} from "react-native-safe-area-context";
 import SelectAbroadType from "../../components/page/create-plan/SelectAbroadType";
+import type {
+    Destination,
+    ImmigrationFormData,
+    PlanFormData,
+    PlanType,
+    StudyFormData,
+    TourismFormData,
+    WorkFormData
+} from "@/src/types/plan";
 
 type AbroadType = "tourism" | "study" | "work" | "immigration" | null;
 
 interface FormData {
   // 旅游
-  destination: string;
+  destination: Destination;
   travelBudget: string;
   travelDays: string;
   companions: string;
   passportStatus: string;
   profession: string;
-  
+
   // 留学
   targetDegree: string;
   currentBackground: string;
@@ -25,7 +33,7 @@ interface FormData {
   financialAbility: string;
   targetMajor: string;
   timePlan: string;
-  
+
   // 工作
   jobField: string;
   certificates: string;
@@ -33,7 +41,7 @@ interface FormData {
   workExperience: string;
   familyAccompany: string;
   jobStatus: string;
-  
+
   // 定居
   assetOverview: string;
   age: string;
@@ -108,7 +116,8 @@ export default function CreatePlanScreen() {
   const [currentStep, setCurrentStep] = useState(0);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [formData, setFormData] = useState<FormData>({
-    destination: "", travelBudget: "", travelDays: "", companions: "", passportStatus: "", profession: "",
+    destination: { country: "" },
+    travelBudget: "", travelDays: "", companions: "", passportStatus: "", profession: "",
     targetDegree: "", currentBackground: "", languageAbility: "", financialAbility: "", targetMajor: "", timePlan: "",
     jobField: "", certificates: "", languageSkill: "", workExperience: "", familyAccompany: "", jobStatus: "",
     assetOverview: "", age: "", coreBackground: "", immigrationPurpose: "", targetPreference: "",
@@ -122,6 +131,29 @@ export default function CreatePlanScreen() {
   const handleSelectType = (type: AbroadType) => {
     setAbroadType(type);
     setCurrentStep(0);
+    // 重置表单数据
+    setFormData({
+      destination: { country: "" },
+      travelBudget: "", travelDays: "", companions: "", passportStatus: "", profession: "",
+      targetDegree: "", currentBackground: "", languageAbility: "", financialAbility: "", targetMajor: "", timePlan: "",
+      jobField: "", certificates: "", languageSkill: "", workExperience: "", familyAccompany: "", jobStatus: "",
+      assetOverview: "", age: "", coreBackground: "", immigrationPurpose: "", targetPreference: "",
+    });
+  };
+
+  const handleGenerate = () => {
+    setIsGenerating(true);
+  };
+
+  const handleGenerateComplete = () => {
+    setIsGenerating(false);
+  };
+
+  const updateDestination = (country: string) => {
+    setFormData(prev => ({
+      ...prev,
+      destination: { country }
+    }));
   };
 
   const handleNext = () => {
@@ -140,15 +172,6 @@ export default function CreatePlanScreen() {
     }
   };
 
-  const handleGenerate = () => {
-    setIsGenerating(true);
-  };
-
-  const handleGenerateComplete = () => {
-    setIsGenerating(false);
-    router.back();
-  };
-
   const updateField = (value: string) => {
     const key = steps[currentStep].key as keyof FormData;
     setFormData(prev => ({ ...prev, [key]: value }));
@@ -156,7 +179,76 @@ export default function CreatePlanScreen() {
 
   const canProceed = () => {
     const key = steps[currentStep].key as keyof FormData;
+    if (key === "destination") {
+      return !!formData.destination?.country;
+    }
     return !!formData[key];
+  };
+
+  // 获取用于 API 的表单数据
+  const getApiFormData = (): PlanFormData => {
+    const type = abroadType as PlanType;
+    switch (type) {
+      case "tourism":
+        return {
+          destination: formData.destination,
+          travelBudget: formData.travelBudget,
+          travelDays: formData.travelDays,
+          companions: formData.companions,
+          passportStatus: formData.passportStatus,
+          profession: formData.profession,
+        } as TourismFormData;
+      case "study":
+        return {
+          destination: formData.destination,
+          targetDegree: formData.targetDegree,
+          currentBackground: formData.currentBackground,
+          languageAbility: formData.languageAbility,
+          financialAbility: formData.financialAbility,
+          targetMajor: formData.targetMajor,
+          timePlan: formData.timePlan,
+        } as StudyFormData;
+      case "work":
+        return {
+          destination: formData.destination,
+          jobField: formData.jobField,
+          certificates: formData.certificates,
+          languageSkill: formData.languageSkill,
+          workExperience: formData.workExperience,
+          familyAccompany: formData.familyAccompany,
+          jobStatus: formData.jobStatus,
+        } as WorkFormData;
+      case "immigration":
+        return {
+          destination: formData.destination,
+          assetOverview: formData.assetOverview,
+          age: formData.age,
+          coreBackground: formData.coreBackground,
+          immigrationPurpose: formData.immigrationPurpose,
+          targetPreference: formData.targetPreference,
+        } as ImmigrationFormData;
+      default:
+        return {
+          destination: formData.destination,
+        } as TourismFormData;
+    }
+  };
+
+  // 生成标题
+  const generateTitle = (): string => {
+    const country = formData.destination?.country || "";
+      switch (abroadType) {
+      case "tourism":
+        return `${country}旅行规划`;
+      case "study":
+        return `${country}留学规划`;
+      case "work":
+        return `${country}工作规划`;
+      case "immigration":
+        return `${country}定居规划`;
+      default:
+        return "出国规划";
+    }
   };
 
   const renderOptions = (options: string[], currentValue: string) => (
@@ -193,8 +285,8 @@ export default function CreatePlanScreen() {
             className="bg-white border border-gray-200 rounded-xl px-4 py-4"
             onPress={() => setShowCountryPicker(true)}
           >
-            <Text className={`text-lg ${formData.destination ? "text-gray-900" : "text-gray-400"}`}>
-              {formData.destination || "点击选择国家"}
+            <Text className={`text-lg ${formData.destination?.country ? "text-gray-900" : "text-gray-400"}`}>
+              {formData.destination?.country || "点击选择国家"}
             </Text>
           </TouchableOpacity>
         );
@@ -282,7 +374,14 @@ export default function CreatePlanScreen() {
   };
 
   if (isGenerating) {
-    return <GenerateResult onComplete={handleGenerateComplete} />;
+    return (
+      <GenerateResult
+        abroadType={abroadType as PlanType}
+        destination={formData.destination}
+        formData={getApiFormData()}
+        onComplete={handleGenerateComplete}
+      />
+    );
   }
 
   return (
@@ -358,7 +457,7 @@ export default function CreatePlanScreen() {
           <CountryPicker
         visible={showCountryPicker}
         onClose={() => setShowCountryPicker(false)}
-        onSelect={(code, name) => updateField(name)}
+        onSelect={(code, name) => updateDestination(name)}
       />
       </SafeAreaView>
     </>

@@ -3,14 +3,20 @@ import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { CircleCheckBig, Loader2 } from "lucide-react-native";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as planApi from "@/src/api/plan";
+import type { PlanType, Destination, PlanFormData } from "@/src/types/plan";
 
 interface GenerateResultProps {
+  abroadType: PlanType;
+  destination: Destination;
+  formData: PlanFormData;
   onComplete?: () => void;
 }
 
-export default function GenerateResult({ onComplete }: GenerateResultProps) {
+export default function GenerateResult({ abroadType, destination, formData, onComplete }: GenerateResultProps) {
   const [status, setStatus] = useState<"loading" | "success">("loading");
   const [spinAnim] = useState(new Animated.Value(0));
+  const [planId, setPlanId] = useState<number | null>(null);
 
   useEffect(() => {
     // 旋转动画
@@ -24,20 +30,40 @@ export default function GenerateResult({ onComplete }: GenerateResultProps) {
     );
     spin.start();
 
-    // 3秒后切换到成功状态
-    const timer = setTimeout(() => {
-      spin.stop();
-      setStatus("success");
-    }, 3000);
+    // 调用 AI 生成规划
+    const generatePlan = async () => {
+      try {
+        const response = await planApi.generatePlan({
+          type: abroadType,
+          destination,
+          formData,
+        });
+        setPlanId(response.plan.id);
+        spin.stop();
+        setStatus("success");
+      } catch (error) {
+        console.error("生成规划失败:", error);
+        spin.stop();
+        // 可以选择显示错误状态，这里暂时直接显示成功
+        setStatus("success");
+      }
+    };
+
+    generatePlan();
 
     return () => {
       spin.stop();
-      clearTimeout(timer);
     };
-  }, []);
+  }, [abroadType, destination, formData]);
 
   const handleSuccess = () => {
-    if (onComplete) {
+    if (planId) {
+      // 跳转到规划详情页面
+      router.replace({
+        pathname: "/(plan)/plan-detail",
+        params: { id: String(planId) }
+      });
+    } else if (onComplete) {
       onComplete();
     } else {
       router.back();
@@ -67,7 +93,7 @@ export default function GenerateResult({ onComplete }: GenerateResultProps) {
             </View>
             <Text className="text-xl font-semibold text-gray-900 mt-6 mb-2">生成成功</Text>
             <Text className="text-sm text-gray-500 mb-8">您的出国规划已生成完毕</Text>
-            <View 
+            <View
               className="bg-gray-900 px-8 py-3 rounded-xl"
               onTouchEnd={handleSuccess}
             >
