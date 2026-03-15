@@ -2,29 +2,31 @@
 // Plan 模块 - API 请求
 // ============================================
 
-import client from './client';
-import { API_ENDPOINTS } from '../constants/api';
+import EventSource from 'react-native-sse';
+import { API_BASE_URL, API_ENDPOINTS } from '../constants/api';
 import type {
-  Plan,
-  PlanListParams,
-  PlanListResponse,
-  Phase,
-  PhaseListResponse,
-  Task,
-  TaskListResponse,
-  CreatePlanParams,
-  UpdatePlanParams,
-  CreatePhaseParams,
-  UpdatePhaseParams,
-  CreateTaskParams,
-  UpdateTaskParams,
   CompleteTaskParams,
+  CreatePhaseParams,
+  CreatePlanParams,
+  CreateTaskParams,
+  Destination,
   GeneratePlanParams,
   GeneratePlanResponse,
+  Phase,
+  PhaseListResponse,
+  Plan,
   PlanFormData,
-  Destination,
+  PlanListParams,
+  PlanListResponse,
   PlanType,
+  Task,
+  TaskListResponse,
+  UpdatePhaseParams,
+  UpdatePlanParams,
+  UpdateTaskParams,
 } from '../types/plan';
+import { storage } from '../utils/storage';
+import client from './client';
 
 // ============================================
 // 规划相关 API
@@ -72,6 +74,81 @@ export async function deletePlan(id: number): Promise<void> {
  */
 export async function generatePlan(data: GeneratePlanParams): Promise<GeneratePlanResponse> {
   return client.post(API_ENDPOINTS.plan.generate, data, { timeout: 60000 });
+}
+
+/**
+ * 流式数据类型
+ */
+export type StreamEventType = 'title' | 'phase_start' | 'phase_end' | 'task' | 'done';
+
+/**
+ * 流式生成 AI 规划
+ * 使用 react-native-sse 实现 GET 方式的流式接收
+ */
+export async function generatePlanStream(
+  data: GeneratePlanParams,
+  onChunk: (chunk: string) => void,
+  onComplete: () => void,
+  onError: (error: Error) => void
+): Promise<void> {
+  // 使用 GET 方式，参数通过 URL query 传递
+  const params = new URLSearchParams({
+    type: data.type,
+    destination: JSON.stringify(data.destination),
+    formData: JSON.stringify(data.formData),
+  });
+  const url = `${API_BASE_URL}${API_ENDPOINTS.plan.generateStream}?${params.toString()}`;
+
+  try {
+    const token = await storage.getAccessToken();
+    console.log('创建 SSE 连接 (GET):', url);
+
+    const es: any = new EventSource(url, {
+      method: 'GET',
+      headers: {'Authorization': token ? `Bearer ${token}` : '',},
+      pollingInterval: 0, // 严禁 Expo 自动重试导致连接重叠
+    });
+
+    es.addEventListener('open', (_event: unknown) => {});
+
+    // 监听初始化消息
+    es.addEventListener('init', (_event: unknown) => {});
+
+    es.addEventListener('message', (event: unknown) => {
+      const messageEvent = event as { data?: string };
+
+      if (messageEvent.data) {
+        // 检查是否是完成信号
+        if (messageEvent.data === '[DONE]' || messageEvent.data === '完成') {
+          onComplete();
+          es.close();
+          return;
+        }
+        // 直接把原始数据传给前端
+        onChunk(messageEvent.data);
+      }
+    });
+
+    // 监听自定义 done 事件
+    es.addEventListener('done', (_event: unknown) => {
+      onComplete();
+      es.close();
+    });
+
+    es.addEventListener('error', (event: unknown) => {
+      const errorEvent = event as { message?: string; error?: { message?: string } };
+      console.log('SSE 连接错误:', errorEvent.message);
+      if (errorEvent.error) {
+        onError(new Error(errorEvent.error.message || 'SSE 连接错误'));
+      } else {
+        onError(new Error(errorEvent.message || 'SSE 连接错误'));
+      }
+      es.close();
+    });
+  } catch (error) {
+    console.error('创建 SSE 连接失败:', error);
+    onError(error instanceof Error ? error : new Error('未知错误'));
+  }
 }
 
 /**

@@ -21,6 +21,7 @@ export const API_ENDPOINTS = {
     update: '/plan',
     delete: '/plan',
     generate: '/plan/generate',
+    generateStream: '/plan/generate/stream',
     saveGenerated: '/plan/save-generated',
     
     phaseList: '/phase', // {planId}/phases
