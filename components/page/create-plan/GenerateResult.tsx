@@ -1,10 +1,10 @@
-import { useEffect, useState, useRef } from "react";
-import { Animated, Easing, StyleSheet, Text, View, ScrollView } from "react-native";
-import { CircleCheckBig, Loader2, Save } from "lucide-react-native";
-import { router } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
 import * as planApi from "@/src/api/plan";
-import type { PlanType, Destination, PlanFormData } from "@/src/types/plan";
+import type { Destination, PlanFormData, PlanType } from "@/src/types/plan";
+import { CircleCheckBig, Loader2, Save } from "lucide-react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Easing, ScrollView, StyleSheet, Text, View } from "react-native";
+import Markdown from "react-native-markdown-display";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 interface GenerateResultProps {
   abroadType: PlanType;
@@ -134,9 +134,7 @@ export default function GenerateResult({ abroadType, destination, formData, onCo
           <Text className="text-sm font-medium text-gray-700 mb-3">生成中...</Text>
           <View className="bg-gray-100 rounded-lg p-4 w-full max-h-64">
             <ScrollView ref={scrollViewRef}>
-              <Text className="text-sm text-gray-800 font-mono whitespace-pre-wrap">
-                {displayContent}
-              </Text>
+              <Markdown>{displayContent}</Markdown>
             </ScrollView>
           </View>
         </View>
@@ -161,9 +159,11 @@ export default function GenerateResult({ abroadType, destination, formData, onCo
           </Text>
           
           <ScrollView ref={previewScrollRef} style={{ maxHeight: 400 }}>
-            <Text className="text-sm text-gray-700 whitespace-pre-wrap">
-              {displayContent || '暂无内容'}
-            </Text>
+            {displayContent ? (
+              <Markdown>{displayContent}</Markdown>
+            ) : (
+              <Text className="text-sm text-gray-500">暂无内容</Text>
+            )}
           </ScrollView>
         </View>
       </ScrollView>

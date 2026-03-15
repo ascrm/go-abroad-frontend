@@ -99,56 +99,50 @@ export async function generatePlanStream(
   });
   const url = `${API_BASE_URL}${API_ENDPOINTS.plan.generateStream}?${params.toString()}`;
 
-  try {
-    const token = await storage.getAccessToken();
-    console.log('创建 SSE 连接 (GET):', url);
+  const maxRetries = 3;
+  const retryDelay = 2000;
+  let retryCount = 0;
 
-    const es: any = new EventSource(url, {
-      method: 'GET',
-      headers: {'Authorization': token ? `Bearer ${token}` : '',},
-      pollingInterval: 0, // 严禁 Expo 自动重试导致连接重叠
-    });
+  const connect = async () => {
+    try {
+      const token = await storage.getAccessToken();
+      console.log('创建 SSE 连接 (GET):', url);
 
-    es.addEventListener('open', (_event: unknown) => {});
+      const es: any = new EventSource(url, {
+        method: 'GET',
+        headers: {'Authorization': token ? `Bearer ${token}` : '',},
+        pollingInterval: 0,
+      });
 
-    // 监听初始化消息
-    es.addEventListener('init', (_event: unknown) => {});
+      es.addEventListener('open', (_event: unknown) => {
+        retryCount = 0; // 连接成功后重置重试次数
+      });
 
-    es.addEventListener('message', (event: unknown) => {
-      const messageEvent = event as { data?: string };
+      es.addEventListener('init', (_event: unknown) => {});
 
-      if (messageEvent.data) {
-        // 检查是否是完成信号
-        if (messageEvent.data === '[DONE]' || messageEvent.data === '完成') {
-          onComplete();
-          es.close();
-          return;
+      es.addEventListener('message', (event: unknown) => {
+        const messageEvent = event as { data?: string };
+        if (messageEvent.data) {
+          onChunk(messageEvent.data);
         }
-        // 直接把原始数据传给前端
-        onChunk(messageEvent.data);
-      }
-    });
+      });
 
-    // 监听自定义 done 事件
-    es.addEventListener('done', (_event: unknown) => {
-      onComplete();
-      es.close();
-    });
+      es.addEventListener('done', (_event: unknown) => {
+        onComplete();
+        es.close();
+      });
 
-    es.addEventListener('error', (event: unknown) => {
-      const errorEvent = event as { message?: string; error?: { message?: string } };
-      console.log('SSE 连接错误:', errorEvent.message);
-      if (errorEvent.error) {
-        onError(new Error(errorEvent.error.message || 'SSE 连接错误'));
-      } else {
-        onError(new Error(errorEvent.message || 'SSE 连接错误'));
-      }
-      es.close();
-    });
-  } catch (error) {
-    console.error('创建 SSE 连接失败:', error);
-    onError(error instanceof Error ? error : new Error('未知错误'));
-  }
+      es.addEventListener('error', (event: unknown) => {
+        const errorEvent = event as { message?: string; error?: { message?: string } };
+        console.log('SSE 连接错误:', errorEvent.message);
+        es.close();
+      });
+    } catch (error) {
+      console.error('创建 SSE 连接失败:', error);
+    }
+  };
+
+  connect();
 }
 
 /**
