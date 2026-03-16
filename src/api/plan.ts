@@ -2,8 +2,6 @@
 // Plan 模块 - API 请求
 // ============================================
 
-import EventSource from 'react-native-sse';
-import { API_BASE_URL, API_ENDPOINTS } from '../constants/api';
 import type {
   CompleteTaskParams,
   CreatePhaseParams,
@@ -24,7 +22,9 @@ import type {
   UpdatePhaseParams,
   UpdatePlanParams,
   UpdateTaskParams,
-} from '../types/plan';
+} from '@/src/types';
+import EventSource from 'react-native-sse';
+import { API_BASE_URL, API_ENDPOINTS } from '../constants/api';
 import { storage } from '../utils/storage';
 import client from './client';
 
@@ -88,8 +88,8 @@ export type StreamEventType = 'title' | 'phase_start' | 'phase_end' | 'task' | '
 export async function generatePlanStream(
   data: GeneratePlanParams,
   onChunk: (chunk: string) => void,
-  onComplete: () => void,
-  onError: (error: Error) => void
+  onComplete: (complete: boolean) => void,
+  onParseKey: (parseKey: string) => void,
 ): Promise<void> {
   // 使用 GET 方式，参数通过 URL query 传递
   const params = new URLSearchParams({
@@ -99,70 +99,32 @@ export async function generatePlanStream(
   });
   const url = `${API_BASE_URL}${API_ENDPOINTS.plan.generateStream}?${params.toString()}`;
 
-  const maxRetries = 3;
-  const retryDelay = 2000;
-  let retryCount = 0;
-
   const connect = async () => {
-    try {
       const token = await storage.getAccessToken();
-      console.log('创建 SSE 连接 (GET):', url);
-
       const es: any = new EventSource(url, {
-        method: 'GET',
-        headers: {'Authorization': token ? `Bearer ${token}` : '',},
-        pollingInterval: 0,
+          method: 'GET',
+          headers: {'Authorization': `Bearer ${token}`},
       });
-
-      es.addEventListener('open', (_event: unknown) => {
-        retryCount = 0; // 连接成功后重置重试次数
+      es.addEventListener('message', (event: any) => onChunk(event.data));
+      es.addEventListener('done', () => onComplete(true));
+      es.addEventListener('parseKey', (event: any) => {
+          onParseKey(event.data);
+          es.close();
       });
-
-      es.addEventListener('init', (_event: unknown) => {});
-
-      es.addEventListener('message', (event: unknown) => {
-        const messageEvent = event as { data?: string };
-        if (messageEvent.data) {
-          onChunk(messageEvent.data);
-        }
-      });
-
-      es.addEventListener('done', (_event: unknown) => {
-        onComplete();
-        es.close();
-      });
-
-      es.addEventListener('error', (event: unknown) => {
-        const errorEvent = event as { message?: string; error?: { message?: string } };
-        console.log('SSE 连接错误:', errorEvent.message);
-        es.close();
-      });
-    } catch (error) {
-      console.error('创建 SSE 连接失败:', error);
-    }
   };
 
-  connect();
+  await connect();
 }
 
 /**
  * 保存 AI 生成的规划
- * 将 AI 生成的规划保存到数据库
+ * 将 parseKey 发送到后端，从 Redis 获取 AI 解析后的 JSON 数据并保存到数据库
  */
 export async function saveGeneratedPlan(generatedData: {
-  title: string;
   type: PlanType;
   destination: Destination;
   formData: PlanFormData;
-  phases: {
-    title: string;
-    description?: string;
-    tasks: {
-      title: string;
-      description?: string;
-      aiSuggestion?: string;
-    }[];
-  }[];
+  parseKey: string;
 }): Promise<Plan> {
   return client.post(API_ENDPOINTS.plan.saveGenerated, generatedData);
 }

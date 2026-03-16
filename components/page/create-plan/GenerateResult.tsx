@@ -20,27 +20,18 @@ export default function GenerateResult({ abroadType, destination, formData, onCo
   const [spinAnim] = useState(new Animated.Value(0));
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [displayContent, setDisplayContent] = useState<string>("");
+  const [parseKey, setParseKey] = useState<string>("");
   const scrollViewRef = useRef<ScrollView>(null);
-  const previewScrollRef = useRef<ScrollView>(null);
+  const contentBufferRef = useRef<string>("");
 
   // 用于自动滚动到底部
   useEffect(() => {
-    if (status === "loading" && displayContent) {
-      // 延迟一下确保内容渲染完成后再滚动
+    if (displayContent) {
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
-    // 生成完成后也滚动到预览区域底部
-    if (status === "ready" && displayContent) {
-      setTimeout(() => {
-        previewScrollRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }
   }, [displayContent, status]);
-
-  // 用于累积显示内容
-  const contentBufferRef = useRef<string>("");
 
   // 启动旋转动画
   useEffect(() => {
@@ -60,29 +51,34 @@ export default function GenerateResult({ abroadType, destination, formData, onCo
   useEffect(() => {
     const startStream = async () => {
       try {
-        await planApi.generatePlanStream(
-          {
+        await planApi.generatePlanStream({
             type: abroadType,
             destination,
             formData,
           },
-          // onChunk - 每次收到内容，直接显示
           (chunk: string) => {
             contentBufferRef.current += chunk;
             setDisplayContent(contentBufferRef.current);
           },
-          // onComplete - 完成
-          () => {
-            spinAnim.stopAnimation();
+          ()=>{
             setStatus("ready");
-          },
-          // onError - 错误
-          (error: Error) => {
-            console.error("流式生成失败:", error);
             spinAnim.stopAnimation();
-            setErrorMsg(error.message);
-            setStatus("error");
-          }
+          },
+          (key: string) => {
+            setParseKey(key);
+            if (status === "saving") {
+              planApi.saveGeneratedPlan({
+                type: abroadType,
+                destination,
+                formData,
+                parseKey: key,
+              })
+                .then(() => {
+                  setStatus("success");
+                  onComplete?.();
+                })
+            }
+          },
         );
       } catch (error) {
         console.error("生成规划失败:", error);
@@ -93,16 +89,27 @@ export default function GenerateResult({ abroadType, destination, formData, onCo
     };
 
     startStream();
-  }, [abroadType, destination, formData, spinAnim]);
+  }, [abroadType, destination, formData, onComplete, spinAnim]);
 
   // 确认并保存规划
   const handleConfirm = async () => {
     if (!displayContent) return;
 
-    // TODO: 目前 displayContent 是原始文本，需要解析成结构化数据后才能保存
-    // 暂时显示提示
-    setErrorMsg("请等待内容生成完成后再保存");
-    setStatus("ready");
+    if (status !== "ready") {
+      setStatus("saving");
+      return;
+    }
+    if (!parseKey) return;
+    setStatus("saving");
+    await planApi.saveGeneratedPlan({
+        type: abroadType,
+        destination,
+        formData,
+        parseKey,
+    });
+    setStatus("success");
+    onComplete?.();
+
   };
 
   const handleRetry = () => {
@@ -132,8 +139,8 @@ export default function GenerateResult({ abroadType, destination, formData, onCo
       {displayContent && (
         <View className="mt-8 w-full">
           <Text className="text-sm font-medium text-gray-700 mb-3">生成中...</Text>
-          <View className="bg-gray-100 rounded-lg p-4 w-full max-h-64">
-            <ScrollView ref={scrollViewRef}>
+          <View className="bg-gray-100 rounded-lg p-4 w-full" style={{ maxHeight: 400 }}>
+            <ScrollView ref={scrollViewRef} style={{ maxHeight: 400 }}>
               <Markdown>{displayContent}</Markdown>
             </ScrollView>
           </View>
@@ -158,7 +165,7 @@ export default function GenerateResult({ abroadType, destination, formData, onCo
             {displayContent ? '生成的规划' : `${destination.country} ${abroadType} 规划`}
           </Text>
           
-          <ScrollView ref={previewScrollRef} style={{ maxHeight: 400 }}>
+          <ScrollView ref={scrollViewRef} style={{ maxHeight: 400 }}>
             {displayContent ? (
               <Markdown>{displayContent}</Markdown>
             ) : (
