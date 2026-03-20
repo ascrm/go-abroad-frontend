@@ -1,18 +1,14 @@
+import { usePlanStore } from "@/src/stores/planStore";
+import { useFocusEffect } from "expo-router";
 import {
   Car,
   Languages,
   Map,
   ShieldAlert, ShieldCheck, Smartphone, Ticket, Utensils, Wallet
 } from "lucide-react-native";
+import { useCallback } from "react";
 import { Linking, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-// Mock data for the current plan context
-const planContext = {
-  country: "日本",
-  city: "东京",
-  type: "旅游"
-};
 
 // Common tools for the top bar
 const commonTools = [
@@ -106,6 +102,15 @@ const tourismData = {
 };
 
 export default function ResourcesScreen() {
+  const { plans, fetchPlans } = usePlanStore();
+  const activePlan = plans.find((p) => p.status === "generating") ?? plans[0];
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchPlans();
+    }, [fetchPlans])
+  );
+
   const handleOpenLink = async (url: string) => {
     if (url.startsWith('http')) {
       try {
@@ -123,7 +128,7 @@ export default function ResourcesScreen() {
   };
 
   // Get country specific data or fallback to a default structure if needed
-  const countryData = tourismData[planContext.country as keyof typeof tourismData] || tourismData["日本"];
+  const countryData = tourismData[activePlan?.destination.country as keyof typeof tourismData] || tourismData["日本"];
   
   const categories = [
     { key: "签证", icon: ShieldCheck, color: "#3B82F6" },
@@ -143,15 +148,15 @@ export default function ResourcesScreen() {
              <View className="flex-row justify-between items-start mb-2">
                 <Text className="text-sm text-gray-500 font-medium">当前规划</Text>
                 <View className="bg-blue-50 px-2 py-1 rounded border border-blue-100">
-                   <Text className="text-xs text-blue-600 font-bold">{planContext.type}</Text>
+                   <Text className="text-xs text-blue-600 font-bold">{activePlan?.type ?? "—"}</Text>
                 </View>
              </View>
              
              <View className="flex-row items-baseline gap-2 mb-1">
-               <Text className="text-2xl font-bold text-gray-900">{planContext.country}</Text>
+               <Text className="text-2xl font-bold text-gray-900">{activePlan?.destination.country ?? "暂无规划"}</Text>
              </View>
-             
-             <Text className="text-base text-gray-500 mb-2">{planContext.city}</Text>
+
+             <Text className="text-base text-gray-500 mb-2">{activePlan?.destination.city ?? "—"}</Text>
 
              <Text className="text-xs text-gray-400">基于此规划为您提供以下个性化服务</Text>
           </View>

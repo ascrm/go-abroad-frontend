@@ -1,26 +1,21 @@
 import * as planApi from "@/src/api/plan";
+import { usePlanStore } from "@/src/stores/planStore";
 import type { Plan } from "@/src/types/plan";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import PlanEmptyState from "../../components/page/plan/PlanEmptyState";
 import PlanList from "../../components/page/plan/PlanList";
 
 export default function PlanScreen() {
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const { plans, fetchPlans, updatePlan, deletePlan } = usePlanStore();
 
-  // 加载规划列表
-  const loadPlans = useCallback(async () => {
-    const response = await planApi.getPlanList({ pageSize: 20 });
-    setPlans(response.list);
-  }, []);
-
-  // 监听页面聚焦，刷新列表（包括首次）
+  // 监听页面聚焦，按需加载（store 有缓存则跳过）
   useFocusEffect(
     useCallback(() => {
-      loadPlans();
-    }, [loadPlans])
+      fetchPlans();
+    }, [fetchPlans])
   );
 
   const handlePlanPress = useCallback((plan: Plan) => {
@@ -46,8 +41,9 @@ export default function PlanScreen() {
           onCreatePlan={() => router.push("/(plan)/create-plan")}
           onPlanPress={handlePlanPress}
           onStart={async (plan) => {
-            await planApi.updatePlan({ id: plan.id, status: "generating" });
-            loadPlans();
+            await planApi.updatePlan({ id: plan.id, status: "generating" }).then((data) => {
+              if(data) updatePlan({ ...plan, status: "generating" });
+            })
           }}
           onDelete={async (plan) => {
             Alert.alert("确认删除", `确定要删除规划「${plan.title}」吗？`, [
@@ -56,8 +52,8 @@ export default function PlanScreen() {
                 text: "删除",
                 style: "destructive",
                 onPress: async () => {
-                  await planApi.deletePlan(plan.id);
-                  loadPlans();
+                  await planApi.deletePlan(plan.id)
+                  deletePlan(plan.id);
                 },
               },
             ]);
