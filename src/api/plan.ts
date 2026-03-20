@@ -88,8 +88,7 @@ export type StreamEventType = 'title' | 'phase_start' | 'phase_end' | 'task' | '
 export async function generatePlanStream(
   data: GeneratePlanParams,
   onChunk: (chunk: string) => void,
-  onComplete: (complete: boolean) => void,
-  onParseKey: (parseKey: string) => void,
+  onComplete: () => void,
 ): Promise<void> {
   // 使用 GET 方式，参数通过 URL query 传递
   const params = new URLSearchParams({
@@ -106,11 +105,7 @@ export async function generatePlanStream(
           headers: {'Authorization': `Bearer ${token}`},
       });
       es.addEventListener('message', (event: any) => onChunk(event.data));
-      es.addEventListener('done', () => onComplete(true));
-      es.addEventListener('parseKey', (event: any) => {
-          onParseKey(event.data);
-          es.close();
-      });
+      es.addEventListener('done', () => onComplete());
   };
 
   await connect();
@@ -118,13 +113,12 @@ export async function generatePlanStream(
 
 /**
  * 保存 AI 生成的规划
- * 将 parseKey 发送到后端，从 Redis 获取 AI 解析后的 JSON 数据并保存到数据库
  */
 export async function saveGeneratedPlan(generatedData: {
   type: PlanType;
   destination: Destination;
   formData: PlanFormData;
-  parseKey: string;
+  content: string;
 }): Promise<Plan> {
   return client.post(API_ENDPOINTS.plan.saveGenerated, generatedData);
 }

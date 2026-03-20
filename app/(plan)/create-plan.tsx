@@ -1,19 +1,20 @@
+import { router } from "expo-router";
 import CountryPicker from "@/components/page/create-plan/CountryPicker";
 import GenerateResult from "@/components/page/create-plan/GenerateResult";
-import {ChevronLeft, ChevronRight} from "lucide-react-native";
-import {useState} from "react";
-import {ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View} from "react-native";
-import {SafeAreaView} from "react-native-safe-area-context";
-import SelectAbroadType from "../../components/page/create-plan/SelectAbroadType";
 import type {
-    Destination,
-    ImmigrationFormData,
-    PlanFormData,
-    PlanType,
-    StudyFormData,
-    TourismFormData,
-    WorkFormData
+  Destination,
+  ImmigrationFormData,
+  PlanFormData,
+  PlanType,
+  StudyFormData,
+  TourismFormData,
+  WorkFormData
 } from "@/src/types/plan";
+import { ChevronLeft, ChevronRight } from "lucide-react-native";
+import { useCallback, useState } from "react";
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import SelectAbroadType from "../../components/page/create-plan/SelectAbroadType";
 
 type AbroadType = "tourism" | "study" | "work" | "immigration" | null;
 
@@ -145,9 +146,14 @@ export default function CreatePlanScreen() {
     setIsGenerating(true);
   };
 
-  const handleGenerateComplete = () => {
+  const handleGenerateComplete = useCallback((planId: number) => {
     setIsGenerating(false);
-  };
+    // 跳转到规划详情页面
+    router.replace({
+      pathname: "/(plan)/plan-detail",
+      params: { id: String(planId) }
+    });
+  }, []);
 
   const updateDestination = (country: string) => {
     setFormData(prev => ({

@@ -1,26 +1,29 @@
 import * as planApi from "@/src/api/plan";
 import type { Destination, PlanFormData, PlanType } from "@/src/types/plan";
+import EventSource from "react-native-sse";
 import { CircleCheckBig, Loader2, Save } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, ScrollView, StyleSheet, Text, View } from "react-native";
 import Markdown from "react-native-markdown-display";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { API_BASE_URL, API_ENDPOINTS } from "@/src/constants/api";
+import { storage } from "@/src/utils/storage";
 
 interface GenerateResultProps {
   abroadType: PlanType;
   destination: Destination;
   formData: PlanFormData;
-  onComplete?: () => void;
+  onComplete?: (planId: number) => void;
 }
 
-type Status = "loading" | "ready" | "saving" | "success" | "error";
+type Status = "loading" | "ready" | "error";
 
 export default function GenerateResult({ abroadType, destination, formData, onComplete }: GenerateResultProps) {
   const [status, setStatus] = useState<Status>("loading");
-  const [spinAnim] = useState(new Animated.Value(0));
+  const [spinAnim] = useState(() => new Animated.Value(0));
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [displayContent, setDisplayContent] = useState<string>("");
-  const [parseKey, setParseKey] = useState<string>("");
+
   const scrollViewRef = useRef<ScrollView>(null);
   const contentBufferRef = useRef<string>("");
 
@@ -49,67 +52,57 @@ export default function GenerateResult({ abroadType, destination, formData, onCo
 
   // 开始流式生成
   useEffect(() => {
+    const esRef: { current: any } = { current: null };
+
     const startStream = async () => {
-      try {
-        await planApi.generatePlanStream({
-            type: abroadType,
-            destination,
-            formData,
-          },
-          (chunk: string) => {
-            contentBufferRef.current += chunk;
-            setDisplayContent(contentBufferRef.current);
-          },
-          ()=>{
-            setStatus("ready");
-            spinAnim.stopAnimation();
-          },
-          (key: string) => {
-            setParseKey(key);
-            if (status === "saving") {
-              planApi.saveGeneratedPlan({
-                type: abroadType,
-                destination,
-                formData,
-                parseKey: key,
-              })
-                .then(() => {
-                  setStatus("success");
-                  onComplete?.();
-                })
-            }
-          },
-        );
-      } catch (error) {
-        console.error("生成规划失败:", error);
+      const params = new URLSearchParams({
+        type: abroadType,
+        destination: JSON.stringify(destination),
+        formData: JSON.stringify(formData),
+      });
+      const token = await storage.getAccessToken();
+      const url = `${API_BASE_URL}${API_ENDPOINTS.plan.generateStream}?${params.toString()}`;
+
+      const es = new EventSource(url, {
+        headers: {'Authorization': `Bearer ${token}`},
+        autoReconnect: false,
+      } as any);
+      esRef.current = es;
+
+      (es as any).addEventListener("message", (event: any) => {
+        contentBufferRef.current += event.data;
+        setDisplayContent(contentBufferRef.current);
+      });
+
+      (es as any).addEventListener("done", () => {
         spinAnim.stopAnimation();
-        setErrorMsg(error instanceof Error ? error.message : "未知错误");
-        setStatus("error");
-      }
+        setStatus("ready");
+        es.close();
+      });
     };
 
     startStream();
-  }, [abroadType, destination, formData, onComplete, spinAnim]);
+
+    return () => {
+      esRef.current?.close();
+    };
+  }, [abroadType, destination, formData]);
 
   // 确认并保存规划
   const handleConfirm = async () => {
-    if (!displayContent) return;
-
-    if (status !== "ready") {
-      setStatus("saving");
-      return;
-    }
-    if (!parseKey) return;
-    setStatus("saving");
-    await planApi.saveGeneratedPlan({
+    try {
+      const savedPlan = await planApi.saveGeneratedPlan({
         type: abroadType,
         destination,
         formData,
-        parseKey,
-    });
-    setStatus("success");
-    onComplete?.();
-
+        content: contentBufferRef.current,
+      });
+      onComplete?.(savedPlan.id);
+    } catch (error) {
+      console.error("保存规划失败:", error);
+      setErrorMsg("保存失败，请重试");
+      setStatus("error");
+    }
   };
 
   const handleRetry = () => {
@@ -162,9 +155,9 @@ export default function GenerateResult({ abroadType, destination, formData, onCo
         {/* 规划预览 */}
         <View className="bg-white rounded-xl p-4 shadow-sm">
           <Text className="text-lg font-semibold text-gray-900 mb-4">
-            {displayContent ? '生成的规划' : `${destination.country} ${abroadType} 规划`}
+            {displayContent ? "生成的规划" : `${destination.country} ${abroadType} 规划`}
           </Text>
-          
+
           <ScrollView ref={scrollViewRef} style={{ maxHeight: 400 }}>
             {displayContent ? (
               <Markdown>{displayContent}</Markdown>
@@ -176,7 +169,7 @@ export default function GenerateResult({ abroadType, destination, formData, onCo
       </ScrollView>
 
       {/* 确认按钮 */}
-      <View className="mt-4 pb-4">
+      <View className="pb-4">
         <View
           className="bg-gray-900 px-8 py-4 rounded-xl flex-row items-center justify-center"
           onTouchEnd={handleConfirm}
@@ -188,37 +181,10 @@ export default function GenerateResult({ abroadType, destination, formData, onCo
     </View>
   );
 
-  // 渲染保存中状态
-  const renderSaving = () => (
-    <View className="items-center">
-      <Animated.View
-        style={[
-          styles.iconContainer,
-          { transform: [{ rotate: spinAnim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] }) }] },
-        ]}
-      >
-        <Loader2 size={48} color="#0076D6" />
-      </Animated.View>
-      <Text className="text-xl font-semibold text-gray-900 mt-6 mb-2">保存中</Text>
-      <Text className="text-sm text-gray-500">正在保存您的规划...</Text>
-    </View>
-  );
-
-  // 渲染成功状态
-  const renderSuccess = () => (
-    <View className="items-center">
-      <View style={styles.successIconContainer}>
-        <CircleCheckBig size={48} color="#22C55E" />
-      </View>
-      <Text className="text-xl font-semibold text-gray-900 mt-6 mb-2">保存成功</Text>
-      <Text className="text-sm text-gray-500 mb-8">正在跳转到规划详情...</Text>
-    </View>
-  );
-
   // 渲染错误状态
   const renderError = () => (
     <View className="items-center px-4">
-      <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
+      <View style={[styles.iconContainer, { backgroundColor: "#FEE2E2" }]}>
         <Text className="text-2xl">!</Text>
       </View>
       <Text className="text-xl font-semibold text-gray-900 mt-6 mb-2">生成失败</Text>
@@ -233,11 +199,9 @@ export default function GenerateResult({ abroadType, destination, formData, onCo
   );
 
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-gray-50">
+    <SafeAreaView edges={["top"]} className="flex-1 bg-gray-50">
       {status === "loading" && renderLoading()}
       {status === "ready" && renderReady()}
-      {status === "saving" && renderSaving()}
-      {status === "success" && renderSuccess()}
       {status === "error" && renderError()}
     </SafeAreaView>
   );
@@ -249,14 +213,6 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  successIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#F0FDF4",
     alignItems: "center",
     justifyContent: "center",
   },
