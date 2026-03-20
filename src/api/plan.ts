@@ -68,20 +68,6 @@ export async function deletePlan(id: number): Promise<void> {
 }
 
 /**
- * 生成 AI 规划
- * 调用 AI 根据用户表单数据生成完整的规划（包含阶段和任务）
- * AI 生成耗时较长，设置 60 秒超时
- */
-export async function generatePlan(data: GeneratePlanParams): Promise<GeneratePlanResponse> {
-  return client.post(API_ENDPOINTS.plan.generate, data, { timeout: 60000 });
-}
-
-/**
- * 流式数据类型
- */
-export type StreamEventType = 'title' | 'phase_start' | 'phase_end' | 'task' | 'done';
-
-/**
  * 流式生成 AI 规划
  * 使用 react-native-sse 实现 GET 方式的流式接收
  */

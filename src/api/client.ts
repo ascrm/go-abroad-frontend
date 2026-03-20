@@ -73,10 +73,7 @@ client.interceptors.response.use(
     if (payload && payload.code !== 20000) {
       const msg = getResponseMessage(payload);
       Alert.alert('业务失败', msg);
-      const err: any = new Error(msg);
-      err.code = payload.code;
-      err.data = payload.data;
-      return Promise.reject(err);
+      return null;
     }
 
     return payload.data;

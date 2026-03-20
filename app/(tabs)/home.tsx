@@ -61,12 +61,7 @@ export default function HomeScreen() {
     }
   }, []);
 
-  // 首次加载数据
-  useEffect(() => {
-    loadArticles();
-  }, [loadArticles]);
-
-  // Tab 切换时加载对应数据
+  // 首次加载 + Tab 切换时加载对应数据
   useEffect(() => {
     if (activeTab === "recommend") {
       loadArticles();
