@@ -7,31 +7,36 @@ import {
   ShieldAlert, ShieldCheck, Smartphone, Ticket, Utensils, Wallet
 } from "lucide-react-native";
 import { useCallback } from "react";
-import { Linking, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import * as Linking from "expo-linking";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // Common tools for the top bar
+// translate 和 maps 使用 app scheme（优先打开原生 App，不支持则 fallback 到网页）
 const commonTools = [
-  { 
-    id: 1, 
-    title: "汇率", 
-    icon: Wallet, 
-    url: "https://www.imocha.cn",
-    color: "#10B981" 
+  {
+    id: 1,
+    title: "汇率",
+    icon: Wallet,
+    url: "xcurrency0appsflyer://",
+    webUrl: "https://xcurrency.com/",
+    color: "#10B981",
   },
-  { 
-    id: 2, 
-    title: "翻译", 
-    icon: Languages, 
-    url: "https://translate.google.com",
-    color: "#3B82F6" 
+  {
+    id: 2,
+    title: "翻译",
+    icon: Languages,
+    url: "googletranslate://?sl=auto&tl=en",
+    webUrl: "https://translate.google.com",
+    color: "#3B82F6",
   },
-  { 
-    id: 3, 
-    title: "地图", 
-    icon: Map, 
-    url: "https://www.google.com/maps",
-    color: "#EF4444" 
+  {
+    id: 3,
+    title: "地图",
+    icon: Map,
+    url: "comgooglemaps://",
+    webUrl: "https://www.google.com/maps",
+    color: "#EF4444",
   },
 ];
 
@@ -111,25 +116,20 @@ export default function ResourcesScreen() {
     }, [fetchPlans])
   );
 
-  const handleOpenLink = async (url: string) => {
-    if (url.startsWith('http')) {
+  const handleOpenLink = async (url: string, webUrl?: string) => {
       try {
-        await Linking.openURL(url);
+          // 1. 先尝试直接打开 App（不管它报不报错）
+          await Linking.openURL(url);
       } catch (error) {
-        console.error('Error opening URL:', error);
+          // 2. 如果打开失败（没装 App 或 Scheme 错），再跳网页
+          if(webUrl)
+          await Linking.openURL(webUrl);
       }
-    } else if (url.startsWith('tel:')) {
-      try {
-        await Linking.openURL(url);
-      } catch (error) {
-        console.error('Error dialing:', error);
-      }
-    }
   };
 
   // Get country specific data or fallback to a default structure if needed
   const countryData = tourismData[activePlan?.destination.country as keyof typeof tourismData] || tourismData["日本"];
-  
+
   const categories = [
     { key: "签证", icon: ShieldCheck, color: "#3B82F6" },
     { key: "住宿", icon: Smartphone, color: "#8B5CF6" },
@@ -141,7 +141,7 @@ export default function ResourcesScreen() {
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-gray-50">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
-        
+
         {/* 1. Plan Context Header */}
         <View className="px-4 pt-4 mb-6">
           <View className="bg-white rounded-xl p-5 border-l-4 border-blue-500 shadow-sm">
@@ -151,7 +151,7 @@ export default function ResourcesScreen() {
                    <Text className="text-xs text-blue-600 font-bold">{activePlan?.type ?? "—"}</Text>
                 </View>
              </View>
-             
+
              <View className="flex-row items-baseline gap-2 mb-1">
                <Text className="text-2xl font-bold text-gray-900">{activePlan?.destination.country ?? "暂无规划"}</Text>
              </View>
@@ -167,10 +167,10 @@ export default function ResourcesScreen() {
           <Text className="text-lg font-bold text-gray-900 mb-4">实用工具</Text>
           <View className="flex-row justify-between bg-white rounded-2xl p-4">
             {commonTools.map((tool) => (
-              <TouchableOpacity 
-                key={tool.id} 
+              <TouchableOpacity
+                key={tool.id}
                 className="items-center flex-1"
-                onPress={() => handleOpenLink(tool.url)}
+                onPress={() => handleOpenLink(tool.url, tool.webUrl)}
               >
                 <View className="w-12 h-12 rounded-full items-center justify-center mb-2" style={{ backgroundColor: `${tool.color}15` }}>
                   <tool.icon size={24} color={tool.color} />
@@ -184,7 +184,7 @@ export default function ResourcesScreen() {
         {/* 3. Vertical Categories (Tourism) */}
         <View className="px-4">
           <Text className="text-lg font-bold text-gray-900 mb-4">个性化推荐</Text>
-          
+
           {categories.map((cat) => {
             const items = countryData[cat.key as keyof typeof countryData];
             if (!items) return null;
@@ -199,8 +199,8 @@ export default function ResourcesScreen() {
                 </View>
 
                 {items.map((item, index) => (
-                  <TouchableOpacity 
-                    key={index} 
+                  <TouchableOpacity
+                    key={index}
                     className="flex-row items-center justify-between py-4 border-t border-gray-100"
                     onPress={() => handleOpenLink(item.url)}
                   >

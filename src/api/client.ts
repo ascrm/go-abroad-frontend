@@ -99,7 +99,7 @@ client.interceptors.response.use(
       Alert.alert('网络错误', error.message || '网络异常，请检查网络后重试');
     }
 
-    if (status === 401) {
+    if (status === 403) {
       // Token 过期，清除本地存储
       await storage.clearAuth();
     }
