@@ -9,6 +9,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ProfileScreen() {
   const [user, setUser] = useState<UserType | null>(null);
+  const goToEditProfile = () => {
+    router.push("/(profile)/edit-profile");
+  };
 
   useEffect(() => {
     const loadUser = async () => {
@@ -62,22 +65,30 @@ export default function ProfileScreen() {
         {/* 2. Profile Info Section */}
         <View className="bg-white px-6 pb-8 pt-2 z-10">
           <View className="flex-row items-center mb-4">
-            <View className="w-24 h-24 rounded-full border border-gray-200 bg-gray-200 overflow-hidden mr-5">
+            <TouchableOpacity
+              className="w-24 h-24 rounded-full border border-gray-200 bg-gray-200 overflow-hidden mr-5"
+              activeOpacity={0.8}
+              onPress={goToEditProfile}
+            >
               <Image
                 source={{ uri: user?.avatar || "https://api.dicebear.com/7.x/avataaars/png?seed=default" }}
                 style={{ width: '100%', height: '100%' }} // 强制指定宽高
                 contentFit="cover"
               />
-            </View>
+            </TouchableOpacity>
 
-            <View className="flex-1 justify-center">
+            <TouchableOpacity
+              className="flex-1 justify-center"
+              activeOpacity={0.8}
+              onPress={goToEditProfile}
+            >
               <Text className="text-2xl font-bold text-gray-900">
                 {user?.nickname || "未登录用户"}
               </Text>
               <Text className="text-gray-500 mt-1">
                 @{user?.username || "guest_user"}
               </Text>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
 
