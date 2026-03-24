@@ -1,5 +1,5 @@
-import * as homeApi from "@/src/api/home";
 import OptionsMenu from "@/components/page/home/OptionsMenu";
+import * as homeApi from "@/src/api/home";
 import type { Article, Question } from "@/src/types/home";
 import { formatRelativeTime } from "@/src/utils/time";
 import { Image } from "expo-image";

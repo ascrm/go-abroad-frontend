@@ -1,9 +1,10 @@
 import * as planApi from "@/src/api/plan";
+import PlanContextHeader from "@/components/common/PlanContextHeader";
 import { usePlanStore } from "@/src/stores/planStore";
 import type { Plan } from "@/src/types/plan";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback } from "react";
-import { Alert } from "react-native";
+import { Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import PlanEmptyState from "../../components/page/plan/PlanEmptyState";
 import PlanList from "../../components/page/plan/PlanList";
@@ -34,8 +35,10 @@ export default function PlanScreen() {
 
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-gray-50">
-      {hasPlans ? (
-        <PlanList
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
+        <PlanContextHeader />
+        {hasPlans ? (
+          <PlanList
           featuredPlan={featuredPlan ?? undefined}
           plans={listPlans}
           onCreatePlan={() => router.push("/(plan)/create-plan")}
@@ -61,7 +64,8 @@ export default function PlanScreen() {
         />
       ) : (
         <PlanEmptyState onCreatePlan={() => router.push("/(plan)/create-plan")} />
-      )}
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
