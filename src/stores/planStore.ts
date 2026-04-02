@@ -11,6 +11,7 @@ interface PlanState {
   createPlan: (plan: Plan) => void;
   updatePlan: (plan: Plan) => void;
   deletePlan: (planId: number) => void;
+  syncGeneratingPlan: (plan: Plan | null) => void;
 }
 
 const CACHE_DURATION = 5 * 60 * 1000; // 缓存有效期 5 分钟
@@ -58,5 +59,16 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     set((state) => ({
       plans: state.plans.filter((p) => p.id !== planId),
     }));
+  },
+
+  syncGeneratingPlan: (plan) => {
+    set((state) => {
+      if (!plan) return state;
+      const exists = state.plans.some((p) => p.id === plan.id);
+      if (exists) {
+        return { plans: state.plans.map((p) => (p.id === plan.id ? plan : p)) };
+      }
+      return { plans: [plan, ...state.plans] };
+    });
   },
 }));

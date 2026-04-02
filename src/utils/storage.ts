@@ -1,9 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { Plan } from '@/src/types/plan';
 
 const AUTH_KEYS = {
   ACCESS_TOKEN: 'access_token',
   REFRESH_TOKEN: 'refresh_token',
   USER: 'user',
+};
+
+const PLAN_KEYS = {
+  GENERATING_PLAN: 'generating_plan',
 };
 
 export const storage = {
@@ -37,5 +42,18 @@ export const storage = {
       AUTH_KEYS.REFRESH_TOKEN,
       AUTH_KEYS.USER,
     ]);
+  },
+
+  async getGeneratingPlan(): Promise<Plan | null> {
+    const data = await AsyncStorage.getItem(PLAN_KEYS.GENERATING_PLAN);
+    return data ? JSON.parse(data) : null;
+  },
+
+  async setGeneratingPlan(plan: Plan | null): Promise<void> {
+    if (plan) {
+      await AsyncStorage.setItem(PLAN_KEYS.GENERATING_PLAN, JSON.stringify(plan));
+    } else {
+      await AsyncStorage.removeItem(PLAN_KEYS.GENERATING_PLAN);
+    }
   },
 };

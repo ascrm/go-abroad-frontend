@@ -98,6 +98,14 @@ export async function generatePlanStream(
 }
 
 /**
+ * 获取 status=generating 的规划（最多一条）
+ * 进入 app 时调用，若存在则持久化到本地
+ */
+export async function getGeneratingPlan(): Promise<Plan | null> {
+  return client.get(API_ENDPOINTS.plan.generatingPlan);
+}
+
+/**
  * 保存 AI 生成的规划
  */
 export async function saveGeneratedPlan(generatedData: {

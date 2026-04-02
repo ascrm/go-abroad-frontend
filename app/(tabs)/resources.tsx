@@ -1,5 +1,4 @@
 import PlanContextHeader from "@/components/common/PlanContextHeader";
-import { usePlanStore } from "@/src/stores/planStore";
 import type { Resource, ResourceCategory } from "@/src/types/resource";
 import { getCategoryList, getResourceList } from "@/src/api/resource";
 import { Image } from "expo-image";
@@ -17,6 +16,7 @@ import {
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Dimensions, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { storage } from "@/src/utils/storage";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const CARD_GAP = 12;
@@ -146,6 +146,7 @@ export default function ResourcesScreen() {
   const [countryResources, setCountryResources] = useState<Resource[]>([]);
   const [categories, setCategories] = useState<ResourceCategory[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<string>("日本");
 
   const handleOpenLink = async (url: string, webUrl?: string) => {
     try {
@@ -155,9 +156,13 @@ export default function ResourcesScreen() {
     }
   };
 
-  const { plans } = usePlanStore();
-  const activePlan = plans.find((p) => p.status === "generating") ?? plans[0];
-  const selectedCountry = (activePlan?.destination.country as string) || "日本";
+  useEffect(() => {
+    const loadCountry = async () => {
+      const plan = await storage.getGeneratingPlan();
+      setSelectedCountry(plan?.destination.country ?? "日本");
+    };
+    loadCountry();
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);

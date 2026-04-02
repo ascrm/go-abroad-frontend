@@ -24,6 +24,8 @@ export const API_ENDPOINTS = {
     generateStream: '/plan/generate/stream',
     saveGenerated: '/plan/save-generated',
     
+    generatingPlan: '/plan/generating', // 获取 status=generating 的规划（最多一条）
+    
     phaseList: '/phase', // {planId}/phases
     phaseCreate: '/phase',
     phaseUpdate: '/phase',

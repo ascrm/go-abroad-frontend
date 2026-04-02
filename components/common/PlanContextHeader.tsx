@@ -1,5 +1,14 @@
-import { usePlanStore } from "@/src/stores/planStore";
-import { useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Text,
+  TouchableOpacity,
+  View
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Circle } from "react-native-svg";
+import { storage } from "@/src/utils/storage";
+import type { Plan } from "@/src/types/plan";
 import {
   Calendar,
   ChevronDown,
@@ -13,15 +22,6 @@ import {
   TrendingUp,
   Wind
 } from "lucide-react-native";
-import { useCallback, useRef, useState } from "react";
-import {
-  Animated,
-  Text,
-  TouchableOpacity,
-  View
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle } from "react-native-svg";
 
 // ============================================
 // 天气相关类型与 mock 数据
@@ -142,22 +142,26 @@ export default function PlanContextHeader({
   collapsedHeight = 120,
   expandedHeight = 360,
 }: PlanContextHeaderProps) {
-  const { plans, fetchPlans } = usePlanStore();
   const insets = useSafeAreaInsets();
   const [expanded, setExpanded] = useState(false);
+  const [generatingPlan, setGeneratingPlan] = useState<Plan | null>(null);
   const [contentHeight, setContentHeight] = useState(0);
   const expandAnim = useRef(new Animated.Value(0)).current;
   const contentOpacityAnim = useRef(new Animated.Value(0)).current;
   const contentSlideAnim = useRef(new Animated.Value(0)).current;
 
-  // 优先取 generating，没有则取第一个
-  const activePlan = plans.find((p) => p.status === "generating") ?? plans[0];
+  useEffect(() => {
+    const loadGeneratingPlan = async () => {
+      const plan = await storage.getGeneratingPlan();
+      setGeneratingPlan(plan);
+    };
+    loadGeneratingPlan();
+  }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchPlans();
-    }, [fetchPlans])
-  );
+  // 无 generatingPlan 时不渲染
+  if (!generatingPlan) return null;
+
+  const activePlan = generatingPlan;
 
   // 切换展开/收起
   const toggleExpand = useCallback(() => {
