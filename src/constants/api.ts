@@ -68,4 +68,7 @@ export const API_ENDPOINTS = {
     view: '/home/interaction/view',
     checkInteraction: '/home/interaction/check',
   },
+  resources: {
+    list: '/resources/list',     // 按国家获取资源列表（按分类聚合，含工具 App）
+  },
 };
