@@ -48,10 +48,10 @@ export default function ProfileScreen() {
       {/* 1. Fixed Header */}
       <View className="bg-white px-4 py-3 z-20">
         <View className="flex-row justify-end items-center gap-4">
-          <TouchableOpacity className="p-2">
+          <TouchableOpacity className="p-2" onPress={() => router.push("/(profile)/messages")}>
             <Bell size={24} color="#4B5563" />
           </TouchableOpacity>
-          <TouchableOpacity className="p-2">
+          <TouchableOpacity className="p-2" onPress={() => router.push("/(profile)/search")}>
             <Search size={24} color="#4B5563" />
           </TouchableOpacity>
           <TouchableOpacity className="p-2" onPress={() => router.push("/(profile)/settings")}>
