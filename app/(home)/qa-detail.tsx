@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { Bookmark, BookmarkCheck, ChartNoAxesColumn, ChevronLeft, MessageCircle, MoreHorizontal, Send, Share2, ThumbsUp } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as homeApi from "@/src/api/home";
+import { HtmlRenderer } from "@/src/components/HtmlRenderer";
 import type { Question, Answer } from "@/src/types/home";
 import { formatRelativeTime } from "@/src/utils/time";
 
@@ -28,12 +29,12 @@ export default function QADetailScreen() {
         homeApi.getAnswerList({ questionId: Number(id), pageSize: 20 }),
       ]);
       setQuestion(questionData);
-      setAnswers(answersData.list);
+      setAnswers(answersData?.list || []);
       setIsFavorite(questionData.isFavorited || false);
 
       // 初始化点赞状态
       const likeState: Record<number, boolean> = {};
-      answersData.list.forEach((answer) => {
+      (answersData?.list || []).forEach((answer) => {
         likeState[answer.id] = answer.isLiked || false;
       });
       setLikedAnswers(likeState);
@@ -118,6 +119,11 @@ export default function QADetailScreen() {
     }
   };
 
+  // 获取头像首字
+  const getAvatarText = (nickname?: string) => {
+    return nickname?.charAt(0) || "游";
+  };
+
   if (loading || !question) {
     return (
       <SafeAreaView edges={['top']} className="flex-1 bg-gray-50">
@@ -157,7 +163,7 @@ export default function QADetailScreen() {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} className="px-4">
+      <ScrollView showsVerticalScrollIndicator={false} className="px-4 flex-1">
         {/* 整体卡片 */}
         <View className="bg-white rounded-2xl overflow-hidden">
           {/* 问题区域 */}
@@ -165,14 +171,14 @@ export default function QADetailScreen() {
             {/* 用户信息 */}
             <View className="flex-row items-center justify-between mb-3">
               <View className="flex-row items-center gap-2">
-                <View className="w-10 h-10 bg-gray-100 rounded-full items-center justify-center">
-                  <Text className="text-base text-gray-600 font-medium">
-                    {question.author?.nickname?.charAt(0) || "用"}
+                <View className="w-10 h-10 bg-sky-50 rounded-full items-center justify-center">
+                  <Text className="text-base text-sky-600 font-medium">
+                    {getAvatarText(question.author?.nickname)}
                   </Text>
                 </View>
                 <View>
                   <Text className="text-sm font-medium text-gray-900">
-                    {question.author?.nickname || "未知用户"}
+                    {question.author?.nickname || "旅行用户"}
                   </Text>
                   <Text className="text-xs text-gray-400">
                     {formatRelativeTime(question.createdAt)}
@@ -180,19 +186,26 @@ export default function QADetailScreen() {
                 </View>
               </View>
               {question.category && (
-                <View className="bg-orange-50 px-2 py-1 rounded-md">
-                  <Text className="text-xs font-medium text-orange-600">{question.category}</Text>
+                <View className="bg-sky-50 px-2 py-1 rounded-md">
+                  <Text className="text-xs font-medium text-sky-600">{question.category}</Text>
                 </View>
               )}
             </View>
 
             {/* 问题标题 */}
-            <Text className="text-xl font-bold text-gray-900 leading-tight mb-4">
+            <Text className="text-xl font-bold text-gray-900 leading-tight mb-3">
               {question.title}
             </Text>
 
+            {/* 问题内容 - 富文本渲染 */}
+            {question.content && (
+              <View className="mt-3 mb-4">
+                <HtmlRenderer html={question.content} />
+              </View>
+            )}
+
             {/* 统计数据 */}
-            <View className="flex-row items-center gap-4">
+            <View className="flex-row items-center gap-4 mt-4">
               <View className="flex-row items-center gap-1">
                 <MessageCircle size={16} color="#9CA3AF" />
                 <Text className="text-sm text-gray-400">{question.repliesCount}</Text>
@@ -205,7 +218,7 @@ export default function QADetailScreen() {
           </View>
 
           {/* 分割线 */}
-          <View className="h-[1] bg-gray-100" />
+          <View className="h-px bg-gray-100" />
 
           {/* 回答列表 */}
           <View className="px-5 py-4">
@@ -225,13 +238,13 @@ export default function QADetailScreen() {
                         <Text className={`text-base font-medium ${
                           answer.isOfficial ? "text-blue-600" : "text-gray-600"
                         }`}>
-                          {answer.author?.nickname?.charAt(0) || "用"}
+                          {getAvatarText(answer.author?.nickname)}
                         </Text>
                       </View>
                       <View>
                         <View className="flex-row items-center gap-2">
                           <Text className="text-base font-medium text-gray-900">
-                            {answer.author?.nickname || "未知用户"}
+                            {answer.author?.nickname || "旅行用户"}
                           </Text>
                           {answer.isOfficial && (
                             <View className="bg-blue-50 px-1.5 py-0.5 rounded">
@@ -254,10 +267,10 @@ export default function QADetailScreen() {
                     </TouchableOpacity>
                   </View>
 
-                  {/* 回答内容 */}
-                  <Text className="text-base text-gray-700 leading-7 mb-4 whitespace-pre-line">
-                    {answer.content}
-                  </Text>
+                  {/* 回答内容 - 富文本渲染 */}
+                  <View className="mb-4">
+                    <HtmlRenderer html={answer.content} />
+                  </View>
 
                   {/* 点赞和回复 */}
                   <View className="flex-row items-center gap-6">
@@ -292,33 +305,38 @@ export default function QADetailScreen() {
       </ScrollView>
 
       {/* 底部输入框 */}
-      <View className="absolute bottom-0 left-0 right-0 bg-white px-4 py-2 border-t border-gray-100">
-        {showReplyInput ? (
-          <View className="flex-row items-center gap-2">
-            <TextInput
-              className="flex-1 bg-gray-100 rounded-full px-4 py-2 text-gray-700 text-sm"
-              placeholder="写下你的回答..."
-              placeholderTextColor="#9CA3AF"
-              value={replyText}
-              onChangeText={setReplyText}
-              multiline
-            />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <View className="bg-white px-4 py-3 border-t border-gray-100">
+          {showReplyInput ? (
+            <View className="flex-row items-end gap-2">
+              <TextInput
+                className="flex-1 bg-gray-100 rounded-2xl px-4 py-3 text-gray-700 text-sm max-h-32"
+                placeholder="写下你的回答..."
+                placeholderTextColor="#9CA3AF"
+                value={replyText}
+                onChangeText={setReplyText}
+                multiline
+              />
+              <TouchableOpacity
+                className="w-10 h-10 bg-blue-600 rounded-full items-center justify-center"
+                onPress={handleReply}
+              >
+                <Send size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          ) : (
             <TouchableOpacity
-              className="w-10 h-10 bg-blue-600 rounded-full items-center justify-center"
-              onPress={handleReply}
+              className="bg-gray-100 rounded-full px-4 py-3"
+              onPress={() => setShowReplyInput(true)}
             >
-              <Send size={18} color="#FFFFFF" />
+              <Text className="text-gray-400 text-sm">写下你的回答...</Text>
             </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity
-            className="bg-gray-100 rounded-full px-4 py-3"
-            onPress={() => setShowReplyInput(true)}
-          >
-            <Text className="text-gray-400 text-sm">写下你的回答...</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+          )}
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

@@ -1,5 +1,7 @@
 // API 地址配置
-export const API_BASE_URL = 'http://172.20.10.3:8080/api';
+// 开发环境使用 mock 服务器，正式环境使用真实服务器
+// Android 模拟器访问本机需用 10.0.2.2:8080，真机/浏览器用 localhost:8080
+export const API_BASE_URL = 'http://192.168.131.195:8080/api';
 
 export const API_ENDPOINTS = {
   auth: {

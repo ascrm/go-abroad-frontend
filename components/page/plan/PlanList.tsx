@@ -7,12 +7,31 @@ import {
   Home,
   Play,
   Trash2,
+  Plus,
 } from "lucide-react-native";
-import { Text, TouchableOpacity, View } from "react-native";
+import { Text, TouchableOpacity, View, StyleSheet, Animated } from "react-native";
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Plan, PlanType } from "@/src/types";
 import { formatDate } from "@/src/utils/time";
+
+interface Colors {
+  primary: string;
+  onPrimary: string;
+  secondary: string;
+  background: string;
+  foreground: string;
+  muted: string;
+  border: string;
+  cardBg: string;
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+  destructive: string;
+  success: string;
+  warning: string;
+  info: string;
+}
 
 interface SwipeableRef {
   close: () => void;
@@ -25,7 +44,26 @@ interface PlanListProps {
   onCreatePlan?: () => void;
   onStart?: (plan: Plan) => Promise<void>;
   onDelete?: (plan: Plan) => Promise<void>;
+  colors?: Colors;
 }
+
+const DEFAULT_COLORS = {
+  primary: "#0D9488",
+  onPrimary: "#FFFFFF",
+  secondary: "#14B8A6",
+  background: "#F0FDFA",
+  foreground: "#134E4A",
+  muted: "#E8F1F4",
+  border: "#99F6E4",
+  cardBg: "#FFFFFF",
+  textPrimary: "#0F172A",
+  textSecondary: "#475569",
+  textMuted: "#94A3B8",
+  destructive: "#DC2626",
+  success: "#059669",
+  warning: "#D97706",
+  info: "#2563EB",
+};
 
 const typeConfig = {
   tourism: { icon: Plane, label: "旅游", color: "#3B82F6" },
@@ -35,14 +73,14 @@ const typeConfig = {
 };
 
 const statusConfig = {
-  completed: { label: "已完成", bg: "#F0FDF4", text: "#16A34A" },
+  completed: { label: "已完成", bg: "#ECFDF5", text: "#059669" },
   generating: { label: "进行中", bg: "#EFF6FF", text: "#2563EB" },
   draft: { label: "待开始", bg: "#FEF3C7", text: "#D97706" },
   archived: { label: "已归档", bg: "#F3F4F6", text: "#6B7280" },
 };
 
 // 重点展示的卡片（进行中规划）
-function FeaturedPlanCard({ plan, onPress }: { plan: Plan; onPress?: (plan: Plan) => void }) {
+function FeaturedPlanCard({ plan, onPress, colors }: { plan: Plan; onPress?: (plan: Plan) => void; colors: Colors }) {
   const config = typeConfig[plan.type as PlanType] || typeConfig.tourism;
   const Icon = config.icon;
   const destinationText =
@@ -72,57 +110,48 @@ function FeaturedPlanCard({ plan, onPress }: { plan: Plan; onPress?: (plan: Plan
 
   return (
     <TouchableOpacity
-      className="rounded-2xl overflow-hidden mb-6 active-opacity-90"
-      activeOpacity={0.85}
+      style={[styles.featuredCard, { backgroundColor: colors.cardBg }]}
+      activeOpacity={0.9}
       onPress={() => onPress?.(plan)}
     >
-      <View className="px-5 pt-6 pb-5" style={{ backgroundColor: `${config.color}18` }}>
-        <View className="flex-row items-center justify-between mb-4">
-          <View className="flex-row items-center gap-2">
-            <View
-              className="w-10 h-10 rounded-xl items-center justify-center"
-              style={{ backgroundColor: `${config.color}30` }}
-            >
-              <Icon size={22} color={config.color} />
-            </View>
-            <Text className="text-base font-semibold" style={{ color: config.color }}>
-              {config.label}
-            </Text>
+      <View style={[styles.featuredHeader, { backgroundColor: `${config.color}12` }]}>
+        <View className="flex-row items-center justify-between">
+          <View style={[styles.typeIconWrapper, { backgroundColor: `${config.color}20` }]}>
+            <Icon size={20} color={config.color} />
           </View>
-          <View className="px-3 py-1 rounded-full" style={{ backgroundColor: status.bg }}>
-            <Text className="text-xs font-medium" style={{ color: status.text }}>
-              {status.label}
-            </Text>
+          <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
+            <Text style={[styles.statusText, { color: status.text }]}>{status.label}</Text>
           </View>
         </View>
 
-        <Text className="text-xl font-bold text-gray-900 mb-1">{plan.title}</Text>
+        <Text style={[styles.featuredTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+          {plan.title}
+        </Text>
 
-        <View className="flex-row items-center gap-1 mb-4">
-          <MapPin size={14} color="#6B7280" />
-          <Text className="text-sm text-gray-500">{destinationText}</Text>
+        <View style={styles.destinationRow}>
+          <MapPin size={13} color={colors.textMuted} />
+          <Text style={[styles.destinationText, { color: colors.textMuted }]}>{destinationText}</Text>
         </View>
 
         {progress.total > 0 && (
-          <View className="mb-2">
-            <View className="flex-row justify-between mb-1.5">
-              <Text className="text-xs text-gray-400">进度</Text>
-              <Text className="text-xs font-medium" style={{ color: config.color }}>
-                {progress.completed}/{progress.total} 已完成 · {progress.percent}%
+          <View style={styles.progressSection}>
+            <View style={styles.progressHeader}>
+              <Text style={[styles.progressLabel, { color: colors.textMuted }]}>整体进度</Text>
+              <Text style={[styles.progressValue, { color: config.color }]}>
+                {progress.completed}/{progress.total} · {progress.percent}%
               </Text>
             </View>
-            <View className="h-1.5 bg-white/60 rounded-full overflow-hidden">
+            <View style={[styles.progressBar, { backgroundColor: colors.muted }]}>
               <View
-                className="h-full rounded-full"
-                style={{ width: `${progress.percent}%`, backgroundColor: config.color }}
+                style={[styles.progressFill, { width: `${progress.percent}%`, backgroundColor: config.color }]}
               />
             </View>
           </View>
         )}
 
-        <View className="flex-row items-center gap-1.5">
-          <Calendar1 size={13} color="#9CA3AF" />
-          <Text className="text-xs text-gray-400">{formatDate(plan.createdAt)}</Text>
+        <View style={styles.dateRow}>
+          <Calendar1 size={12} color={colors.textMuted} />
+          <Text style={[styles.dateText, { color: colors.textMuted }]}>{formatDate(plan.createdAt)}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -135,11 +164,13 @@ function PlanListCard({
   onPress,
   onStart,
   onDelete,
+  colors,
 }: {
   plan: Plan;
   onPress?: (plan: Plan) => void;
   onStart?: (plan: Plan) => void;
   onDelete?: (plan: Plan) => void;
+  colors: Colors;
 }) {
   const config = typeConfig[plan.type as PlanType] || typeConfig.tourism;
   const Icon = config.icon;
@@ -150,34 +181,30 @@ function PlanListCard({
   const swipeableRef = useRef<SwipeableRef>(null);
 
   const renderRightActions = useCallback(() => (
-    <View className="flex-row items-center self-stretch">
-      {/* 开始按钮 */}
+    <View style={styles.swipeActions}>
       <TouchableOpacity
-        className="w-16 h-full items-center justify-center"
-        style={{ backgroundColor: "#10B981" }}
+        style={[styles.swipeAction, { backgroundColor: colors.success }]}
         onPress={() => {
           onStart?.(plan);
           swipeableRef.current?.close();
         }}
       >
-        <Play size={20} color="#FFFFFF" />
-        <Text className="text-white text-xs mt-1">开始</Text>
+        <Play size={18} color="#FFFFFF" />
+        <Text style={styles.swipeActionText}>开始</Text>
       </TouchableOpacity>
 
-      {/* 删除按钮 */}
       <TouchableOpacity
-        className="w-16 h-full items-center justify-center"
-        style={{ backgroundColor: "#EF4444" }}
+        style={[styles.swipeAction, { backgroundColor: colors.destructive }]}
         onPress={() => {
           onDelete?.(plan);
           swipeableRef.current?.close();
         }}
       >
-        <Trash2 size={20} color="#FFFFFF" />
-        <Text className="text-white text-xs mt-1">删除</Text>
+        <Trash2 size={18} color="#FFFFFF" />
+        <Text style={styles.swipeActionText}>删除</Text>
       </TouchableOpacity>
     </View>
-  ), [onStart, onDelete, plan]);
+  ), [onStart, onDelete, plan, colors.success, colors.destructive]);
 
   return (
     <Swipeable
@@ -187,34 +214,29 @@ function PlanListCard({
       overshootRight={false}
     >
       <TouchableOpacity
-        className="bg-white rounded-2xl p-4 flex-row items-center border border-gray-100"
+        style={[styles.listCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
         activeOpacity={0.7}
         onPress={() => onPress?.(plan)}
       >
-        <View
-          className="w-10 h-10 rounded-xl items-center justify-center mr-3"
-          style={{ backgroundColor: `${config.color}15` }}
-        >
-          <Icon size={20} color={config.color} />
+        <View style={[styles.listIconWrapper, { backgroundColor: `${config.color}12` }]}>
+          <Icon size={18} color={config.color} />
         </View>
 
-        <View className="flex-1 mr-3">
-          <Text className="text-sm font-semibold text-gray-900 mb-1" numberOfLines={1}>
+        <View style={styles.listContent}>
+          <Text style={[styles.listTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {plan.title}
           </Text>
-          <View className="flex-row items-center gap-1">
-            <MapPin size={12} color="#9CA3AF" />
-            <Text className="text-xs text-gray-400">{destinationText}</Text>
+          <View style={styles.listMeta}>
+            <MapPin size={11} color={colors.textMuted} />
+            <Text style={[styles.listMetaText, { color: colors.textMuted }]}>{destinationText}</Text>
           </View>
         </View>
 
-        <View className="items-end gap-1.5">
-          <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: status.bg }}>
-            <Text className="text-xs font-medium" style={{ color: status.text }}>
-              {status.label}
-            </Text>
+        <View style={styles.listRight}>
+          <View style={[styles.statusBadgeSmall, { backgroundColor: status.bg }]}>
+            <Text style={[styles.statusTextSmall, { color: status.text }]}>{status.label}</Text>
           </View>
-          <Text className="text-xs text-gray-400">{formatDate(plan.createdAt)}</Text>
+          <Text style={[styles.listDate, { color: colors.textMuted }]}>{formatDate(plan.createdAt)}</Text>
         </View>
       </TouchableOpacity>
     </Swipeable>
@@ -228,47 +250,50 @@ export default function PlanList({
   onCreatePlan,
   onStart,
   onDelete,
+  colors,
 }: PlanListProps) {
+  const c = colors || DEFAULT_COLORS;
+
   return (
-    <View className="flex-1 px-5 pt-5">
-      <View className="flex-row items-center justify-between mb-5">
-        <Text className="text-2xl font-bold text-gray-900">我的规划</Text>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: c.textPrimary }]}>我的规划</Text>
         <TouchableOpacity
-          className="bg-gray-900 px-4 py-2 rounded-lg active-opacity-80"
-          activeOpacity={0.8}
+          style={[styles.createBtn, { backgroundColor: c.primary }]}
+          activeOpacity={0.85}
           onPress={onCreatePlan}
         >
-          <Text className="text-white text-sm font-medium">+ 新建</Text>
+          <Plus size={16} color={c.onPrimary} />
+          <Text style={[styles.createBtnText, { color: c.onPrimary }]}>新建</Text>
         </TouchableOpacity>
       </View>
 
-      <View className="flex-1">
+      <View style={styles.list}>
         {/* 重点展示：进行中的规划 */}
         {featuredPlan ? (
-          <FeaturedPlanCard plan={featuredPlan} onPress={onPlanPress} />
+          <FeaturedPlanCard plan={featuredPlan} onPress={onPlanPress} colors={c} />
         ) : (
           <TouchableOpacity
-            className="rounded-2xl border-2 border-dashed border-gray-200 mb-6 active-opacity-80"
+            style={[styles.emptyFeatured, { borderColor: c.border }]}
             activeOpacity={0.7}
             onPress={onCreatePlan}
           >
-            <View className="px-5 py-8 items-center">
-              <Text className="text-base font-medium text-gray-400 mb-1">
-                您还没有正在进行的规划
-              </Text>
-              <Text className="text-sm text-gray-400">请选择规划开始</Text>
-            </View>
+            <Text style={[styles.emptyFeaturedText, { color: c.textMuted }]}>
+              您还没有正在进行的规划
+            </Text>
+            <Text style={[styles.emptyFeaturedSubtext, { color: c.textMuted }]}>请选择规划开始</Text>
           </TouchableOpacity>
         )}
 
         {/* 其余列表（可左滑） */}
         {plans.map((plan) => (
-          <View key={plan.id} className="mb-3">
+          <View key={plan.id} style={styles.listItem}>
             <PlanListCard
               plan={plan}
               onPress={onPlanPress}
               onStart={onStart}
               onDelete={onDelete}
+              colors={c}
             />
           </View>
         ))}
@@ -276,3 +301,194 @@ export default function PlanList({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  createBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 4,
+  },
+  createBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  list: {
+    flex: 1,
+  },
+  listItem: {
+    marginBottom: 12,
+  },
+  featuredCard: {
+    borderRadius: 20,
+    marginBottom: 24,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  featuredHeader: {
+    padding: 20,
+  },
+  typeIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  featuredTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginTop: 16,
+    marginBottom: 6,
+  },
+  destinationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  destinationText: {
+    fontSize: 13,
+  },
+  progressSection: {
+    marginTop: 16,
+  },
+  progressHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  progressLabel: {
+    fontSize: 12,
+  },
+  progressValue: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  progressBar: {
+    height: 6,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 12,
+  },
+  dateText: {
+    fontSize: 11,
+  },
+  emptyFeatured: {
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderRadius: 20,
+    padding: 32,
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  emptyFeaturedText: {
+    fontSize: 15,
+    fontWeight: "500",
+    marginBottom: 4,
+  },
+  emptyFeaturedSubtext: {
+    fontSize: 13,
+  },
+  listCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  listIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 14,
+  },
+  listContent: {
+    flex: 1,
+    marginRight: 12,
+  },
+  listTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  listMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  listMetaText: {
+    fontSize: 12,
+  },
+  listRight: {
+    alignItems: "flex-end",
+    gap: 6,
+  },
+  statusBadgeSmall: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  statusTextSmall: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  listDate: {
+    fontSize: 11,
+  },
+  swipeActions: {
+    flexDirection: "row",
+    alignItems: "stretch",
+  },
+  swipeAction: {
+    width: 64,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  swipeActionText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "500",
+  },
+});

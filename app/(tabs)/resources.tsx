@@ -1,4 +1,3 @@
-import PlanContextHeader from "@/components/common/PlanContextHeader";
 import type { Resource, ResourceCategory } from "@/src/types/resource";
 import { getCategoryList, getResourceList } from "@/src/api/resource";
 import { Image } from "expo-image";
@@ -190,9 +189,6 @@ export default function ResourcesScreen() {
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-gray-50">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
-
-        {/* 规划上下文顶栏 */}
-        <PlanContextHeader />
 
         {/* 加载中 */}
         {loading && (

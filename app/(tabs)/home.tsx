@@ -227,29 +227,50 @@ function QuestionCard({ question, onPress }: {
   question: Question;
   onPress: () => void;
 }) {
+  // 获取作者首字，默认为"游"
+  const getAvatarText = (nickname?: string) => {
+    if (!nickname) return '游';
+    return nickname.charAt(0);
+  };
+
+  // 格式化浏览数，超过1000显示为"1.2k"格式
+  const formatCount = (count: number) => {
+    if (count >= 1000) {
+      return `${(count / 1000).toFixed(1)}k`;
+    }
+    return String(count);
+  };
+
   return (
     <AnimatedPressable onPress={onPress} style={styles.questionCardWrapper}>
       <View style={styles.questionCard}>
         <View style={styles.questionHeader}>
-          {question.category && <View style={styles.tag}><Text style={styles.tagText}>{question.tag}</Text></View>}
+          {question.category && (
+            <View style={styles.categoryTag}>
+              <Text style={styles.categoryTagText}>{question.category}</Text>
+            </View>
+          )}
           <Text style={styles.timeText}>{formatRelativeTime(question.createdAt)}</Text>
         </View>
         <Text style={styles.questionTitle} numberOfLines={2}>{question.title}</Text>
+        {question.content && (
+          <Text style={styles.questionContent} numberOfLines={2}>{question.content}</Text>
+        )}
         <View style={styles.questionFooter}>
           <View style={styles.authorInfo}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{question.author?.nickname?.charAt(0) || "用"}</Text>
+              <Text style={styles.avatarText}>{getAvatarText(question.author?.nickname)}</Text>
             </View>
-            <Text style={styles.authorName}>{question.author?.nickname || "未知用户"}</Text>
+            <Text style={styles.authorName}>{question.author?.nickname || "旅行用户"}</Text>
           </View>
           <View style={styles.questionStats}>
             <View style={styles.actionBtn}>
               <MessageCircle size={16} color="#9CA3AF" />
-              <Text style={styles.actionCount}>{question.repliesCount}</Text>
+              <Text style={styles.actionCount}>{formatCount(question.repliesCount)}</Text>
             </View>
             <View style={[styles.actionBtn, { marginLeft: 16 }]}>
               <ChartNoAxesColumn size={16} color="#9CA3AF" />
-              <Text style={styles.actionCount}>{question.views}</Text>
+              <Text style={styles.actionCount}>{formatCount(question.views)}</Text>
             </View>
           </View>
         </View>
@@ -489,7 +510,11 @@ export default function HomeScreen() {
             <Image source={require("@/assets/images/logo.png")} style={styles.logoImg} contentFit="contain" />
             <Text style={styles.logoText}>GoAbroad</Text>
           </View>
-          <TouchableOpacity style={styles.searchIconBtn} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.searchIconBtn}
+            activeOpacity={0.7}
+            onPress={() => router.push("/(home)/search")}
+          >
             <Search size={22} color="#000000" />
           </TouchableOpacity>
         </View>
@@ -575,13 +600,17 @@ const styles = StyleSheet.create({
     shadowColor: "#000000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
   },
   questionHeader: { flexDirection: "row", alignItems: "center", marginBottom: 12, gap: 8 },
-  questionTitle: { fontSize: 16, fontWeight: "600", color: "#111827", lineHeight: 22, marginBottom: 14 },
+  questionTitle: { fontSize: 16, fontWeight: "600", color: "#111827", lineHeight: 22 },
+  questionContent: { fontSize: 14, color: "#6B7280", lineHeight: 20, marginTop: 8, marginBottom: 12 },
   questionFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   authorInfo: { flexDirection: "row", alignItems: "center", gap: 10 },
-  avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#F3F4F6", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E5E7EB" },
-  avatarText: { fontSize: 14, fontWeight: "600", color: "#374151" },
+  avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#F0F9FF", alignItems: "center", justifyContent: "center" },
+  avatarText: { fontSize: 14, fontWeight: "600", color: "#0EA5E9" },
   authorName: { fontSize: 14, color: "#6B7280", fontWeight: "500" },
   questionStats: { flexDirection: "row", alignItems: "center" },
+  // 分类标签
+  categoryTag: { backgroundColor: "#EFF6FF", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  categoryTagText: { fontSize: 12, fontWeight: "600", color: "#3B82F6" },
   // 标签
   tag: { backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: "#E5E7EB" },
   tagText: { fontSize: 12, fontWeight: "600", color: "#374151" },
