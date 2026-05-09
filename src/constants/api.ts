@@ -1,5 +1,5 @@
 // API 地址配置
-export const API_BASE_URL = 'http://192.168.31.183:8080/api';
+export const API_BASE_URL = 'http://172.20.10.3:8080/api';
 
 export const API_ENDPOINTS = {
   auth: {

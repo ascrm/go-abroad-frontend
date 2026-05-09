@@ -78,7 +78,7 @@ const registerMethods: {
     iconType: "lucide",
     icon: Mail,
     iconColor: "#0076D6",
-    onPress: () => router.push("/(auth)/register-form"),
+    onPress: () => router.push("/(auth)/register-account"),
   },
   {
     id: "google",
