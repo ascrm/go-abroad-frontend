@@ -346,9 +346,6 @@ export default function SearchScreen() {
                       <Text style={styles.resultTitle} numberOfLines={2}>
                         {item.title}
                       </Text>
-                      <Text style={styles.resultDesc} numberOfLines={1}>
-                        {item.content}
-                      </Text>
                       <View style={styles.resultMeta}>
                         <Text style={styles.resultViews}>{item.repliesCount} 回答</Text>
                         <Text style={styles.resultViews}>{item.views} 浏览</Text>

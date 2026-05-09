@@ -1,6 +1,7 @@
 import OptionsMenu from "@/components/page/home/OptionsMenu";
 import type { Article, Question } from "@/src/types/home";
 import { formatRelativeTime } from "@/src/utils/time";
+import { stripHtmlTags } from "@/src/utils/html";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import {
@@ -9,6 +10,7 @@ import {
   MessageCircle,
   Search,
   Sparkles,
+  ThumbsUp,
 } from "lucide-react-native";
 import { useCallback, useRef, useState } from "react";
 import {
@@ -227,7 +229,7 @@ function QuestionCard({ question, onPress }: {
   question: Question;
   onPress: () => void;
 }) {
-  // 获取作者首字，默认为"游"
+  // 获取作者首字
   const getAvatarText = (nickname?: string) => {
     if (!nickname) return '游';
     return nickname.charAt(0);
@@ -244,33 +246,43 @@ function QuestionCard({ question, onPress }: {
   return (
     <AnimatedPressable onPress={onPress} style={styles.questionCardWrapper}>
       <View style={styles.questionCard}>
-        <View style={styles.questionHeader}>
-          {question.category && (
-            <View style={styles.categoryTag}>
-              <Text style={styles.categoryTagText}>{question.category}</Text>
-            </View>
-          )}
-          <Text style={styles.timeText}>{formatRelativeTime(question.createdAt)}</Text>
-        </View>
+        {/* 第一行：问题标题 */}
         <Text style={styles.questionTitle} numberOfLines={2}>{question.title}</Text>
-        {question.content && (
-          <Text style={styles.questionContent} numberOfLines={2}>{question.content}</Text>
+
+        {/* 如果有回答，显示回答摘要 */}
+        {question.topAnswer && (
+          <>
+            {/* 第二行：回答作者信息 */}
+            <View style={styles.answerAuthorRow}>
+              <View style={styles.avatarSmall}>
+                <Text style={styles.avatarTextSmall}>{getAvatarText(question.topAnswer.author?.nickname)}</Text>
+              </View>
+              <Text style={styles.authorNameSmall} numberOfLines={1}>
+                {question.topAnswer.author?.nickname || "旅行用户"}
+              </Text>
+            </View>
+
+            {/* 第三行：回答内容摘要 */}
+            <Text style={styles.answerContent} numberOfLines={2}>
+              {question.topAnswer.content}
+            </Text>
+          </>
         )}
+
+        {/* 底部统计 */}
         <View style={styles.questionFooter}>
-          <View style={styles.authorInfo}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{getAvatarText(question.author?.nickname)}</Text>
-            </View>
-            <Text style={styles.authorName}>{question.author?.nickname || "旅行用户"}</Text>
-          </View>
           <View style={styles.questionStats}>
-            <View style={styles.actionBtn}>
-              <MessageCircle size={16} color="#9CA3AF" />
-              <Text style={styles.actionCount}>{formatCount(question.repliesCount)}</Text>
+            <View style={styles.statItem}>
+              <ThumbsUp size={14} color="#9CA3AF" />
+              <Text style={styles.statText}>{formatCount(question.topAnswer?.likes || 0)}</Text>
             </View>
-            <View style={[styles.actionBtn, { marginLeft: 16 }]}>
-              <ChartNoAxesColumn size={16} color="#9CA3AF" />
-              <Text style={styles.actionCount}>{formatCount(question.views)}</Text>
+            <View style={[styles.statItem, { marginLeft: 12 }]}>
+              <MessageCircle size={14} color="#9CA3AF" />
+              <Text style={styles.statText}>{formatCount(question.repliesCount)}</Text>
+            </View>
+            <View style={[styles.statItem, { marginLeft: 12 }]}>
+              <ChartNoAxesColumn size={14} color="#9CA3AF" />
+              <Text style={styles.statText}>{formatCount(question.views)}</Text>
             </View>
           </View>
         </View>
@@ -602,12 +614,22 @@ const styles = StyleSheet.create({
   questionHeader: { flexDirection: "row", alignItems: "center", marginBottom: 12, gap: 8 },
   questionTitle: { fontSize: 16, fontWeight: "600", color: "#111827", lineHeight: 22 },
   questionContent: { fontSize: 14, color: "#6B7280", lineHeight: 20, marginTop: 8, marginBottom: 12 },
-  questionFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  questionFooter: { flexDirection: "row", alignItems: "center", marginTop: 12 },
   authorInfo: { flexDirection: "row", alignItems: "center", gap: 10 },
   avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#F0F9FF", alignItems: "center", justifyContent: "center" },
   avatarText: { fontSize: 14, fontWeight: "600", color: "#0EA5E9" },
   authorName: { fontSize: 14, color: "#6B7280", fontWeight: "500" },
   questionStats: { flexDirection: "row", alignItems: "center" },
+  // 回答摘要样式
+  answerAuthorRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 },
+  avatarSmall: { width: 24, height: 24, borderRadius: 12, backgroundColor: "#F0F9FF", alignItems: "center", justifyContent: "center" },
+  avatarTextSmall: { fontSize: 11, fontWeight: "600", color: "#0EA5E9" },
+  authorNameSmall: { fontSize: 13, color: "#6B7280", fontWeight: "500", flex: 1 },
+  answerContent: { fontSize: 14, color: "#374151", lineHeight: 20, marginTop: 8 },
+  questionFooter: { flexDirection: "row", alignItems: "center", marginTop: 12 },
+  questionStats: { flexDirection: "row", alignItems: "center" },
+  statItem: { flexDirection: "row", alignItems: "center", gap: 4 },
+  statText: { fontSize: 12, color: "#9CA3AF" },
   // 分类标签
   categoryTag: { backgroundColor: "#EFF6FF", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
   categoryTagText: { fontSize: 12, fontWeight: "600", color: "#3B82F6" },

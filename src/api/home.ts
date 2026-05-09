@@ -20,6 +20,10 @@ import type {
   AnswerListResponse,
   CreateAnswerParams,
   UpdateAnswerParams,
+  Comment,
+  CommentListParams,
+  CommentListResponse,
+  CreateCommentParams,
   InteractionParams,
   InteractionResponse,
   CheckInteractionParams,
@@ -158,6 +162,31 @@ export async function updateAnswer(data: UpdateAnswerParams): Promise<Answer> {
  */
 export async function deleteAnswer(id: number): Promise<void> {
   return client.delete(`${API_ENDPOINTS.home.answerDelete}/${id}`);
+}
+
+// ============================================
+// 问答-评论相关 API
+// ============================================
+
+/**
+ * 获取评论列表
+ */
+export async function getCommentList(params: CommentListParams): Promise<CommentListResponse> {
+  return client.get(API_ENDPOINTS.home.commentList, { params });
+}
+
+/**
+ * 创建评论
+ */
+export async function createComment(data: CreateCommentParams): Promise<Comment> {
+  return client.post(API_ENDPOINTS.home.commentCreate, data);
+}
+
+/**
+ * 删除评论
+ */
+export async function deleteComment(id: number): Promise<void> {
+  return client.delete(`${API_ENDPOINTS.home.commentDelete}/${id}`);
 }
 
 // ============================================

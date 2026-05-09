@@ -63,7 +63,6 @@ export interface UpdateArticleParams extends CreateArticleParams {
 export interface Question {
   id: number;
   title: string;
-  content: string;
   authorId: number;
   author?: User;
   category?: string;
@@ -73,7 +72,21 @@ export interface Question {
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;
-  isFavorited?: boolean; // 当前用户是否收藏
+  isFavorited?: boolean;
+  topAnswer?: TopAnswer;
+  hasAnswers?: boolean;
+}
+
+export interface TopAnswer {
+  author: {
+    userId: number;
+    username?: string;
+    nickname?: string;
+    avatar?: string;
+  };
+  content: string;
+  likes: number;
+  repliesCount: number;
 }
 
 export interface QuestionListParams {
@@ -92,7 +105,6 @@ export interface QuestionListResponse {
 
 export interface CreateQuestionParams {
   title: string;
-  content: string;
   category?: string;
 }
 
@@ -140,6 +152,42 @@ export interface CreateAnswerParams {
 
 export interface UpdateAnswerParams extends CreateAnswerParams {
   id: number;
+}
+
+// ============================================
+// 问答-评论相关类型
+// ============================================
+
+export interface Comment {
+  id: number;
+  answerId: number;
+  parentId: number | null;
+  author?: User;
+  content: string;
+  likes: number;
+  repliesCount: number;
+  replies: Comment[];
+  createdAt: string;
+  isLiked?: boolean;
+}
+
+export interface CommentListParams {
+  answerId: number;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface CommentListResponse {
+  list: Comment[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CreateCommentParams {
+  answerId: number;
+  parentId?: number;
+  content: string;
 }
 
 // ============================================

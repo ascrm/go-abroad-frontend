@@ -1,29 +1,36 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { Bookmark, BookmarkCheck, ChartNoAxesColumn, ChevronLeft, MessageCircle, MoreHorizontal, Send, Share2, ThumbsUp } from "lucide-react-native";
+import { Bookmark, BookmarkCheck, ChevronLeft, MessageCircle, Plus, Send, Share2, ThumbsUp } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as homeApi from "@/src/api/home";
 import { HtmlRenderer } from "@/src/components/HtmlRenderer";
-import type { Question, Answer } from "@/src/types/home";
-import { formatRelativeTime } from "@/src/utils/time";
+import type { Question, Answer, Comment } from "@/src/types/home";
+import { formatDate } from "@/src/utils/time";
 
 export default function QADetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [question, setQuestion] = useState<Question | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [likedAnswers, setLikedAnswers] = useState<Record<number, boolean>>({});
+  const [bookmarkedAnswers, setBookmarkedAnswers] = useState<Record<number, boolean>>({});
   const [isFavorite, setIsFavorite] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // 评论相关状态
+  const [commentsMap, setCommentsMap] = useState<Record<number, Comment[]>>({});
+  const [commentsLoading, setCommentsLoading] = useState<Record<number, boolean>>({});
+  const [expandedAnswers, setExpandedAnswers] = useState<Record<number, boolean>>({});
+  const [commentInputs, setCommentInputs] = useState<Record<number, string>>({});
+  const [replyingTo, setReplyingTo] = useState<Record<number, number | null>>({});
 
   // 加载问题详情和回答列表
   const loadData = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     try {
-      // 并行加载问题和回答
       const [questionData, answersData] = await Promise.all([
         homeApi.getQuestionDetail(Number(id)),
         homeApi.getAnswerList({ questionId: Number(id), pageSize: 20 }),
@@ -32,12 +39,14 @@ export default function QADetailScreen() {
       setAnswers(answersData?.list || []);
       setIsFavorite(questionData.isFavorited || false);
 
-      // 初始化点赞状态
       const likeState: Record<number, boolean> = {};
+      const bookmarkState: Record<number, boolean> = {};
       (answersData?.list || []).forEach((answer) => {
         likeState[answer.id] = answer.isLiked || false;
+        bookmarkState[answer.id] = false;
       });
       setLikedAnswers(likeState);
+      setBookmarkedAnswers(bookmarkState);
     } catch (error) {
       console.error("加载问答详情失败:", error);
     } finally {
@@ -45,7 +54,6 @@ export default function QADetailScreen() {
     }
   }, [id]);
 
-  // 首次加载
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -61,12 +69,33 @@ export default function QADetailScreen() {
     }
   }, [question]);
 
-  // 切换收藏
+  // 加载评论
+  const loadComments = useCallback(async (answerId: number) => {
+    setCommentsLoading(prev => ({ ...prev, [answerId]: true }));
+    try {
+      const response = await homeApi.getCommentList({ answerId, pageSize: 50 });
+      setCommentsMap(prev => ({ ...prev, [answerId]: response.list || [] }));
+    } catch (error) {
+      console.error("加载评论失败:", error);
+    } finally {
+      setCommentsLoading(prev => ({ ...prev, [answerId]: false }));
+    }
+  }, []);
+
+  // 切换评论区
+  const toggleComments = (answerId: number) => {
+    const isExpanded = expandedAnswers[answerId];
+    if (!isExpanded) {
+      loadComments(answerId);
+    }
+    setExpandedAnswers(prev => ({ ...prev, [answerId]: !isExpanded }));
+  };
+
+  // 切换收藏问题
   const handleToggleFavorite = async () => {
     if (!question) return;
     const currentState = isFavorite;
     setIsFavorite(!currentState);
-
     try {
       await homeApi.toggleFavorite({
         targetId: question.id,
@@ -79,14 +108,10 @@ export default function QADetailScreen() {
     }
   };
 
-  // 切换点赞
+  // 切换点赞回答
   const handleToggleLike = async (answerId: number) => {
     const currentState = likedAnswers[answerId] || false;
-    setLikedAnswers((prev) => ({
-      ...prev,
-      [answerId]: !currentState,
-    }));
-
+    setLikedAnswers((prev) => ({ ...prev, [answerId]: !currentState }));
     try {
       await homeApi.toggleLike({
         targetId: answerId,
@@ -94,18 +119,30 @@ export default function QADetailScreen() {
         action: "like",
       });
     } catch (error) {
-      setLikedAnswers((prev) => ({
-        ...prev,
-        [answerId]: currentState,
-      }));
+      setLikedAnswers((prev) => ({ ...prev, [answerId]: currentState }));
       console.error("点赞操作失败:", error);
+    }
+  };
+
+  // 切换收藏回答
+  const handleToggleBookmark = async (answerId: number) => {
+    const currentState = bookmarkedAnswers[answerId] || false;
+    setBookmarkedAnswers((prev) => ({ ...prev, [answerId]: !currentState }));
+    try {
+      await homeApi.toggleFavorite({
+        targetId: answerId,
+        targetType: "answer",
+        action: "favorite",
+      });
+    } catch (error) {
+      setBookmarkedAnswers((prev) => ({ ...prev, [answerId]: currentState }));
+      console.error("收藏操作失败:", error);
     }
   };
 
   // 提交回答
   const handleReply = async () => {
     if (!replyText.trim() || !question) return;
-
     try {
       const newAnswer = await homeApi.createAnswer({
         questionId: question.id,
@@ -119,14 +156,68 @@ export default function QADetailScreen() {
     }
   };
 
+  // 提交评论
+  const handleSubmitComment = async (answerId: number) => {
+    const content = commentInputs[answerId]?.trim();
+    if (!content) return;
+    const parentId = replyingTo[answerId];
+    try {
+      const newComment = await homeApi.createComment({
+        answerId,
+        parentId: parentId || undefined,
+        content,
+      });
+      setCommentsMap(prev => {
+        const currentComments = prev[answerId] || [];
+        if (parentId) {
+          const updatedComments = addReplyToComment(currentComments, parentId, newComment);
+          return { ...prev, [answerId]: updatedComments };
+        } else {
+          return { ...prev, [answerId]: [newComment, ...currentComments] };
+        }
+      });
+      setCommentInputs(prev => ({ ...prev, [answerId]: "" }));
+      setReplyingTo(prev => ({ ...prev, [answerId]: null }));
+      setAnswers(prev => prev.map(a =>
+        a.id === answerId ? { ...a, repliesCount: a.repliesCount + 1 } : a
+      ));
+    } catch (error) {
+      console.error("提交评论失败:", error);
+    }
+  };
+
+  // 递归添加回复
+  const addReplyToComment = (comments: Comment[], parentId: number, newReply: Comment): Comment[] => {
+    return comments.map(comment => {
+      if (comment.id === parentId) {
+        return { ...comment, replies: [newReply, ...(comment.replies || [])], repliesCount: comment.repliesCount + 1 };
+      }
+      if (comment.replies && comment.replies.length > 0) {
+        return { ...comment, replies: addReplyToComment(comment.replies, parentId, newReply) };
+      }
+      return comment;
+    });
+  };
+
+  // 设置回复目标
+  const setReplyTarget = (answerId: number, commentId: number | null) => {
+    setReplyingTo(prev => ({ ...prev, [answerId]: commentId }));
+  };
+
   // 获取头像首字
   const getAvatarText = (nickname?: string) => {
     return nickname?.charAt(0) || "游";
   };
 
+  // 格式化日期
+  const formatAnswerDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+  };
+
   if (loading || !question) {
     return (
-      <SafeAreaView edges={['top']} className="flex-1 bg-gray-50">
+      <SafeAreaView edges={['top']} className="flex-1 bg-white">
         <View className="px-4 py-3 flex-row items-center">
           <TouchableOpacity onPress={() => router.back()} className="p-1">
             <ChevronLeft size={24} color="#374151" />
@@ -140,17 +231,14 @@ export default function QADetailScreen() {
   }
 
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-gray-50">
+    <SafeAreaView edges={['top']} className="flex-1 bg-white">
       {/* 头部 */}
-      <View className="px-4 py-3 flex-row items-center justify-between">
+      <View className="px-4 py-3 flex-row items-center justify-between border-b border-gray-100">
         <TouchableOpacity onPress={() => router.back()} className="p-1">
           <ChevronLeft size={24} color="#374151" />
         </TouchableOpacity>
         <View className="flex-row items-center gap-4">
-          <TouchableOpacity
-            onPress={handleToggleFavorite}
-            className="p-1"
-          >
+          <TouchableOpacity onPress={handleToggleFavorite} className="p-1">
             {isFavorite ? (
               <BookmarkCheck size={20} color="#3B82F6" fill="#3B82F6" />
             ) : (
@@ -163,145 +251,170 @@ export default function QADetailScreen() {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} className="px-4 flex-1">
-        {/* 整体卡片 */}
-        <View className="bg-white rounded-2xl overflow-hidden">
-          {/* 问题区域 */}
-          <View className="px-5 pt-5 pb-4">
-            {/* 用户信息 */}
-            <View className="flex-row items-center justify-between mb-3">
-              <View className="flex-row items-center gap-2">
-                <View className="w-10 h-10 bg-sky-50 rounded-full items-center justify-center">
-                  <Text className="text-base text-sky-600 font-medium">
-                    {getAvatarText(question.author?.nickname)}
-                  </Text>
-                </View>
-                <View>
-                  <Text className="text-sm font-medium text-gray-900">
-                    {question.author?.nickname || "旅行用户"}
-                  </Text>
-                  <Text className="text-xs text-gray-400">
-                    {formatRelativeTime(question.createdAt)}
-                  </Text>
-                </View>
-              </View>
-              {question.category && (
-                <View className="bg-sky-50 px-2 py-1 rounded-md">
-                  <Text className="text-xs font-medium text-sky-600">{question.category}</Text>
-                </View>
-              )}
-            </View>
+      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+        {/* 问题区域 */}
+        <View className="px-4 py-5">
+          {/* 第一行：问题标题 */}
+          <Text className="text-2xl font-bold text-gray-900 leading-tight">
+            {question.title}
+          </Text>
 
-            {/* 问题标题 */}
-            <Text className="text-xl font-bold text-gray-900 leading-tight mb-3">
-              {question.title}
+          {/* 第二行：回答数和关注数 */}
+          <View className="flex-row items-center gap-4 mt-3">
+            <Text className="text-sm text-gray-500">
+              {question.repliesCount} 个回答
             </Text>
-
-            {/* 问题内容 - 富文本渲染 */}
-            {question.content && (
-              <View className="mt-3 mb-4">
-                <HtmlRenderer html={question.content} />
-              </View>
-            )}
-
-            {/* 统计数据 */}
-            <View className="flex-row items-center gap-4 mt-4">
-              <View className="flex-row items-center gap-1">
-                <MessageCircle size={16} color="#9CA3AF" />
-                <Text className="text-sm text-gray-400">{question.repliesCount}</Text>
-              </View>
-              <View className="flex-row items-center gap-1">
-                <ChartNoAxesColumn size={16} color="#9CA3AF" />
-                <Text className="text-sm text-gray-400">{question.views}</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* 分割线 */}
-          <View className="h-px bg-gray-100" />
-
-          {/* 回答列表 */}
-          <View className="px-5 py-4">
-            <Text className="text-base font-semibold text-gray-900 mb-4">
-              {answers.length} 个回答
+            <Text className="text-sm text-gray-400">|</Text>
+            <Text className="text-sm text-gray-500">
+              {question.views} 浏览
             </Text>
-
-            <View className="gap-6">
-              {answers.map((answer) => (
-                <View key={answer.id}>
-                  {/* 回答者信息 */}
-                  <View className="flex-row items-center justify-between mb-3">
-                    <View className="flex-row items-center gap-3">
-                      <View className={`w-10 h-10 rounded-full items-center justify-center ${
-                        answer.isOfficial ? "bg-blue-100" : "bg-gray-100"
-                      }`}>
-                        <Text className={`text-base font-medium ${
-                          answer.isOfficial ? "text-blue-600" : "text-gray-600"
-                        }`}>
-                          {getAvatarText(answer.author?.nickname)}
-                        </Text>
-                      </View>
-                      <View>
-                        <View className="flex-row items-center gap-2">
-                          <Text className="text-base font-medium text-gray-900">
-                            {answer.author?.nickname || "旅行用户"}
-                          </Text>
-                          {answer.isOfficial && (
-                            <View className="bg-blue-50 px-1.5 py-0.5 rounded">
-                              <Text className="text-xs text-blue-600">官方</Text>
-                            </View>
-                          )}
-                          {answer.isBestAnswer && (
-                            <View className="bg-green-50 px-1.5 py-0.5 rounded">
-                              <Text className="text-xs text-green-600">最佳</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text className="text-xs text-gray-400">
-                          {formatRelativeTime(answer.createdAt)}
-                        </Text>
-                      </View>
-                    </View>
-                    <TouchableOpacity>
-                      <MoreHorizontal size={18} color="#9CA3AF" />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* 回答内容 - 富文本渲染 */}
-                  <View className="mb-4">
-                    <HtmlRenderer html={answer.content} />
-                  </View>
-
-                  {/* 点赞和回复 */}
-                  <View className="flex-row items-center gap-6">
-                    <TouchableOpacity
-                      className="flex-row items-center gap-1"
-                      onPress={() => handleToggleLike(answer.id)}
-                    >
-                      <ThumbsUp
-                        size={16}
-                        color={likedAnswers[answer.id] ? "#3B82F6" : "#9CA3AF"}
-                        fill={likedAnswers[answer.id] ? "#3B82F6" : "none"}
-                      />
-                      <Text className={`text-sm ${likedAnswers[answer.id] ? "text-blue-600" : "text-gray-400"}`}>
-                        {answer.likes}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity className="flex-row items-center gap-1">
-                      <MessageCircle size={16} color="#9CA3AF" />
-                      <Text className="text-sm text-gray-400">{answer.repliesCount} 回复</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* 分割线 */}
-                  <View className="h-px bg-gray-100 mt-5" />
-                </View>
-              ))}
-            </View>
           </View>
         </View>
+
+        {/* 分割线 */}
+        <View className="h-px bg-gray-100 mx-4" />
+
+        {/* 回答列表 */}
+        <View className="px-4">
+          {answers.map((answer, index) => (
+            <View key={answer.id}>
+              {/* 回答者信息 */}
+              <View className="flex-row items-center justify-between py-4">
+                <View className="flex-row items-center gap-3">
+                  <View className={`w-10 h-10 rounded-full items-center justify-center ${
+                    answer.isOfficial ? "bg-blue-100" : "bg-gray-100"
+                  }`}>
+                    <Text className={`text-base font-medium ${
+                      answer.isOfficial ? "text-blue-600" : "text-gray-600"
+                    }`}>
+                      {getAvatarText(answer.author?.nickname)}
+                    </Text>
+                  </View>
+                  <View>
+                    <View className="flex-row items-center gap-2">
+                      <Text className="text-base font-medium text-gray-900">
+                        {answer.author?.nickname || "旅行用户"}
+                      </Text>
+                      {answer.isOfficial && (
+                        <View className="bg-blue-50 px-1.5 py-0.5 rounded">
+                          <Text className="text-xs text-blue-600">官方</Text>
+                        </View>
+                      )}
+                      {answer.isBestAnswer && (
+                        <View className="bg-green-50 px-1.5 py-0.5 rounded">
+                          <Text className="text-xs text-green-600">最佳</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                </View>
+                <TouchableOpacity className="flex-row items-center gap-1 px-3 py-1.5 border border-blue-500 rounded-full">
+                  <Plus size={14} color="#3B82F6" />
+                  <Text className="text-sm text-blue-500 font-medium">关注</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* 回答内容 */}
+              <View className="mb-3">
+                <HtmlRenderer html={answer.content} />
+              </View>
+
+              {/* 日期 */}
+              <Text className="text-sm text-gray-400 mb-3">
+                {formatAnswerDate(answer.createdAt)}
+              </Text>
+
+              {/* 操作栏：点赞、收藏、评论 */}
+              <View className="flex-row items-center justify-end gap-5 pb-4">
+                <TouchableOpacity
+                  className="flex-row items-center gap-1"
+                  onPress={() => handleToggleLike(answer.id)}
+                >
+                  <ThumbsUp
+                    size={18}
+                    color={likedAnswers[answer.id] ? "#3B82F6" : "#9CA3AF"}
+                    fill={likedAnswers[answer.id] ? "#3B82F6" : "none"}
+                  />
+                  <Text className={`text-sm ${likedAnswers[answer.id] ? "text-blue-600" : "text-gray-400"}`}>
+                    {answer.likes}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className="flex-row items-center gap-1"
+                  onPress={() => handleToggleBookmark(answer.id)}
+                >
+                  <Bookmark
+                    size={18}
+                    color={bookmarkedAnswers[answer.id] ? "#3B82F6" : "#9CA3AF"}
+                    fill={bookmarkedAnswers[answer.id] ? "#3B82F6" : "none"}
+                  />
+                  <Text className={`text-sm ${bookmarkedAnswers[answer.id] ? "text-blue-600" : "text-gray-400"}`}>
+                    收藏
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className="flex-row items-center gap-1"
+                  onPress={() => toggleComments(answer.id)}
+                >
+                  <MessageCircle size={18} color="#9CA3AF" />
+                  <Text className="text-sm text-gray-400">{answer.repliesCount}</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* 评论区域 */}
+              {expandedAnswers[answer.id] && (
+                <View className="bg-gray-50 rounded-xl p-4 mb-4">
+                  {commentsLoading[answer.id] ? (
+                    <Text className="text-sm text-gray-400 text-center">加载中...</Text>
+                  ) : (
+                    <View className="gap-4">
+                      {(commentsMap[answer.id] || []).map((comment) => (
+                        <CommentItem
+                          key={comment.id}
+                          comment={comment}
+                          answerId={answer.id}
+                          replyingTo={replyingTo[answer.id]}
+                          setReplyTarget={(commentId) => setReplyTarget(answer.id, commentId)}
+                          getAvatarText={getAvatarText}
+                        />
+                      ))}
+                    </View>
+                  )}
+                  {/* 评论输入框 */}
+                  <View className="mt-3 flex-row items-end gap-2">
+                    {replyingTo[answer.id] && (
+                      <TouchableOpacity onPress={() => setReplyTarget(answer.id, null)}>
+                        <Text className="text-xs text-blue-500">取消回复</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TextInput
+                      className="flex-1 bg-white rounded-xl px-3 py-2 text-gray-700 text-sm"
+                      placeholder={replyingTo[answer.id] ? "写下你的回复..." : "写下你的评论..."}
+                      placeholderTextColor="#9CA3AF"
+                      value={commentInputs[answer.id] || ""}
+                      onChangeText={(text) => setCommentInputs(prev => ({ ...prev, [answer.id]: text }))}
+                      multiline
+                    />
+                    <TouchableOpacity
+                      className="w-8 h-8 bg-blue-600 rounded-full items-center justify-center"
+                      onPress={() => handleSubmitComment(answer.id)}
+                    >
+                      <Send size={14} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* 回答之间的分割线 */}
+              {index < answers.length - 1 && (
+                <View className="h-px bg-gray-100" />
+              )}
+            </View>
+          ))}
+        </View>
+
         {/* 底部空隙 */}
-        <View className="h-4" />
+        <View className="h-20" />
       </ScrollView>
 
       {/* 底部输入框 */}
@@ -338,5 +451,69 @@ export default function QADetailScreen() {
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+// 评论项组件
+interface CommentItemProps {
+  comment: Comment;
+  answerId: number;
+  replyingTo: number | null;
+  setReplyTarget: (commentId: number | null) => void;
+  getAvatarText: (nickname?: string) => string;
+}
+
+function CommentItem({ comment, answerId, replyingTo, setReplyTarget, getAvatarText }: CommentItemProps) {
+  return (
+    <View>
+      <View className="flex-row items-start gap-2">
+        <View className="w-8 h-8 bg-gray-200 rounded-full items-center justify-center">
+          <Text className="text-xs text-gray-600 font-medium">
+            {getAvatarText(comment.author?.nickname)}
+          </Text>
+        </View>
+        <View className="flex-1">
+          <View className="flex-row items-center gap-2">
+            <Text className="text-sm font-medium text-gray-900">
+              {comment.author?.nickname || "用户"}
+            </Text>
+            <Text className="text-xs text-gray-400">
+              {formatDate(comment.createdAt)}
+            </Text>
+          </View>
+          <Text className="text-sm text-gray-700 mt-1">{comment.content}</Text>
+          <TouchableOpacity className="mt-1" onPress={() => setReplyTarget(comment.id)}>
+            <Text className="text-xs text-blue-500">回复</Text>
+          </TouchableOpacity>
+
+          {/* 子评论 */}
+          {comment.replies && comment.replies.length > 0 && (
+            <View className="mt-3 ml-4 pl-3 border-l-2 border-gray-200">
+              {comment.replies.map((reply) => (
+                <View key={reply.id} className="mt-2">
+                  <View className="flex-row items-center gap-2">
+                    <View className="w-6 h-6 bg-gray-100 rounded-full items-center justify-center">
+                      <Text className="text-xs text-gray-500 font-medium">
+                        {getAvatarText(reply.author?.nickname)}
+                      </Text>
+                    </View>
+                    <Text className="text-xs font-medium text-gray-900">
+                      {reply.author?.nickname || "用户"}
+                    </Text>
+                    <Text className="text-xs text-gray-400">
+                      {formatDate(reply.createdAt)}
+                    </Text>
+                  </View>
+                  <Text className="text-sm text-gray-700 mt-1 ml-8">{reply.content}</Text>
+                  <TouchableOpacity className="mt-1 ml-8" onPress={() => setReplyTarget(reply.id)}>
+                    <Text className="text-xs text-blue-500">回复</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
+    </View>
   );
 }
