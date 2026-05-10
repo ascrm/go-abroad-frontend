@@ -79,4 +79,8 @@ export const API_ENDPOINTS = {
     list: '/resources/list',      // 按国家获取资源列表（按分类聚合，含工具 App）
     categories: '/resources/categories', // 获取资源分类列表
   },
+  profile: {
+    browseHistory: '/profile/browse-history',
+    playlists: '/profile/playlists',
+  },
 };

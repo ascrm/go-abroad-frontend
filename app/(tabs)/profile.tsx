@@ -1,171 +1,225 @@
 import { User as UserType } from "@/src/types/auth";
+import { profileApi, BrowseHistoryItem } from "@/src/api/profile";
+import { getPlanList, Plan } from "@/src/api/plan";
 import { storage } from "@/src/utils/storage";
 import { Image } from "expo-image";
-import { router } from "expo-router";
-import { Bell, Bookmark, FileText, Folder, Search, Settings } from "lucide-react-native";
-import { useEffect, useState } from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { router, useFocusEffect } from "expo-router";
+import { Bell, Bookmark, ChevronDown, FileText, Folder, Plus, Settings } from "lucide-react-native";
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ProfileScreen() {
   const [user, setUser] = useState<UserType | null>(null);
-  const goToEditProfile = () => {
-    router.push("/(profile)/edit-profile");
-  };
+  const [history, setHistory] = useState<BrowseHistoryItem[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadUser = async () => {
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
       const userStr = await storage.getUser();
       if (userStr) {
-        try {
-          const userData = JSON.parse(userStr) as UserType;
-          setUser(userData);
-        } catch {}
+        const userData = JSON.parse(userStr) as UserType;
+        setUser(userData);
       }
-    };
-    loadUser();
+      const [historyData, plansData] = await Promise.all([
+        profileApi.getBrowseHistory(),
+        getPlanList({ page: 1, pageSize: 10 }),
+      ]);
+      setHistory(historyData);
+      setPlans(plansData.list || []);
+    } catch (error) {
+      console.error("加载数据失败:", error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Mock Data for Content
-  const historyItems = [
-    { id: 1, title: "英国留学签证办理指南", author: "官方发布", views: "1.2k" },
-    { id: 2, title: "2024各国入境政策汇总", author: "留学助手", views: "3.4k" },
-    { id: 3, title: "行李打包清单checklist", author: "Go Abroad", views: "800" },
-    { id: 4, title: "美国F1签证申请全攻略", author: "官方发布", views: "2.1k" },
-    { id: 5, title: "行前英语口语速成", author: "Go Abroad", views: "500" },
-  ];
-
-  const playlists = [
-    { id: 1, title: "我的英国规划", count: 5 },
-    { id: 2, title: "美国探亲准备", count: 2 },
-    { id: 3, title: "澳洲旅游签证", count: 1 },
-    { id: 4, title: "加拿大夏令营", count: 3 },
-  ];
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-white">
-      
-      {/* 1. Fixed Header */}
-      <View className="bg-white px-4 py-3 z-20">
-        <View className="flex-row justify-end items-center gap-4">
-          <TouchableOpacity className="p-2" onPress={() => router.push("/(profile)/messages")}>
-            <Bell size={24} color="#4B5563" />
+    <SafeAreaView edges={["top"]} className="flex-1 bg-white">
+      {/* 顶部导航栏 */}
+      <View className="bg-white px-4 py-2 flex-row items-center justify-between">
+        {/* 左上角账号按钮 */}
+        <Pressable
+          accessibilityLabel="切换账号"
+          accessibilityHint="点击切换或管理账号"
+          className="flex-row items-center px-3 py-1.5 rounded-full border border-gray-200"
+          style={{ minWidth: 72 }}
+          onPress={() => router.push("/(profile)/switch-account")}
+        >
+          <Text className="text-sm font-medium text-gray-700">账号</Text>
+          <ChevronDown size={14} color="#6B7280" style={{ marginLeft: 2 }} />
+        </Pressable>
+
+        {/* 右上角按钮组 */}
+        <View className="flex-row items-center gap-1">
+          <TouchableOpacity
+            accessibilityLabel="消息通知"
+            className="p-2 rounded-full active:bg-gray-100"
+            onPress={() => router.push("/(profile)/messages")}
+          >
+            <Bell size={22} color="#4B5563" />
           </TouchableOpacity>
-          <TouchableOpacity className="p-2" onPress={() => router.push("/(profile)/search")}>
-            <Search size={24} color="#4B5563" />
-          </TouchableOpacity>
-          <TouchableOpacity className="p-2" onPress={() => router.push("/(profile)/settings")}>
-            <Settings size={24} color="#4B5563" />
+          <TouchableOpacity
+            accessibilityLabel="设置"
+            className="p-2 rounded-full active:bg-gray-100"
+            onPress={() => router.push("/(profile)/settings")}
+          >
+            <Settings size={22} color="#4B5563" />
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView className="flex-1" stickyHeaderIndices={[1]} showsVerticalScrollIndicator={false}>
-
-        {/* 2. Profile Info Section */}
-        <View className="bg-white px-6 pb-8 pt-2 z-10">
-          <View className="flex-row items-center mb-4">
-            <TouchableOpacity
-              className="w-24 h-24 rounded-full border border-gray-200 bg-gray-200 overflow-hidden mr-5"
-              activeOpacity={0.8}
-              onPress={goToEditProfile}
-            >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
+        {/* 用户信息区 */}
+        <View className="bg-white px-5 py-6">
+          <Pressable
+            accessibilityLabel={`${user?.nickname || "未登录用户"}，点击编辑资料`}
+            className="flex-row items-center active:opacity-80"
+            onPress={() => router.push("/(profile)/edit-profile")}
+          >
+            <View className="w-20 h-20 rounded-full border-2 border-gray-100 overflow-hidden mr-4 items-center justify-center bg-gray-100">
               <Image
-                source={{ uri: user?.avatar || "https://api.dicebear.com/7.x/avataaars/png?seed=default" }}
-                style={{ width: '100%', height: '100%' }} // 强制指定宽高
+                source={{
+                  uri: user?.avatar || "https://api.dicebear.com/7.x/avataaars/png?seed=default",
+                }}
+                style={{ width: 76, height: 76 }}
                 contentFit="cover"
+                contentPosition="center"
               />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              className="flex-1 justify-center"
-              activeOpacity={0.8}
-              onPress={goToEditProfile}
-            >
+            </View>
+            <View className="flex-1">
               <Text className="text-2xl font-bold text-gray-900">
                 {user?.nickname || "未登录用户"}
               </Text>
-              <Text className="text-gray-500 mt-1">
-                @{user?.username || "guest_user"}
-              </Text>
-            </TouchableOpacity>
+              <Text className="text-gray-500 mt-1">@{user?.username || "guest_user"}</Text>
+            </View>
+          </Pressable>
+        </View>
+
+        {/* 加载状态 */}
+        {loading ? (
+          <View className="items-center justify-center py-16">
+            <ActivityIndicator size="large" color="#6B7280" />
           </View>
-        </View>
+        ) : (
+          <>
+            {/* 历史记录区 */}
+            <View className="px-4 pt-6">
+              <View className="flex-row justify-between items-center mb-4 px-1">
+                <Text className="text-lg font-bold text-gray-900">历史记录</Text>
+                <TouchableOpacity>
+                  <Text className="text-sm font-medium text-blue-600">查看全部</Text>
+                </TouchableOpacity>
+              </View>
 
-        {/* 3. History / Content Section */}
-        <View className="py-6 px-4">
-          <View className="flex-row justify-between items-center mb-4 px-2">
-            <Text className="text-lg font-bold text-gray-900">历史记录</Text>
-            <Text className="text-sm text-blue-600 font-medium">查看全部</Text>
-          </View>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="gap-4">
-             {historyItems.map((item) => (
-               <TouchableOpacity key={item.id} className="w-40 mr-3 bg-white p-3 rounded-xl">
-                 <View className="w-full h-24 bg-gray-200 rounded-lg mb-3 overflow-hidden">
-                    {/* Placeholder for Thumbnail */}
-                    <View className="w-full h-full bg-gray-300 items-center justify-center">
-                       <FileText size={24} color="#9CA3AF"/>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingRight: 16 }}
+              >
+                {history.map((item) => (
+                  <Pressable
+                    key={item.id}
+                    className="bg-white rounded-2xl mr-3 overflow-hidden active:scale-95"
+                    style={{ width: 160 }}
+                    accessibilityLabel={item.title}
+                  >
+                    <View className="h-28 bg-gray-200 items-center justify-center">
+                      <FileText size={28} color="#9CA3AF" />
                     </View>
-                 </View>
-                 <Text className="text-sm font-semibold text-gray-800 leading-tight mb-1" numberOfLines={2}>{item.title}</Text>
-                 <Text className="text-xs text-gray-500">{item.author} • {item.views} 阅读</Text>
-               </TouchableOpacity>
-             ))}
-          </ScrollView>
-        </View>
-
-        {/* 4. Playlists / Plans Section - Horizontal Scroll */}
-        <View className="py-2 px-4 mb-4">
-           <View className="flex-row justify-between items-center mb-4 px-2">
-            <Text className="text-lg font-bold text-gray-900">规划列表</Text>
-            <Text className="text-sm text-blue-600 font-medium">管理</Text>
-          </View>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="gap-4">
-            {playlists.map((playlist) => (
-              <TouchableOpacity key={playlist.id} className="w-40 mr-3">
-                 <View className="w-full h-24 bg-gray-200 rounded-xl mb-3 overflow-hidden relative">
-                    {/* Placeholder for Cover */}
-                    <View className="w-full h-full bg-gray-300 items-center justify-center">
-                       <Folder size={32} color="#9CA3AF"/>
+                    <View className="p-3">
+                      <Text className="text-sm font-semibold text-gray-800 leading-snug mb-1" numberOfLines={2}>
+                        {item.title}
+                      </Text>
+                      <Text className="text-xs text-gray-400">
+                        {item.author} · {item.views}
+                      </Text>
                     </View>
-                    <View className="absolute bottom-2 right-2 bg-black/70 px-2 py-1 rounded">
-                       <Text className="text-white text-xs font-medium">{playlist.count}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* 规划列表区 */}
+            <View className="px-4 pt-6">
+              <View className="flex-row justify-between items-center mb-4 px-1">
+                <Text className="text-lg font-bold text-gray-900">规划列表</Text>
+                <TouchableOpacity>
+                  <Text className="text-sm font-medium text-blue-600">管理</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingRight: 16 }}
+              >
+                {plans.map((plan) => (
+                  <Pressable
+                    key={plan.id}
+                    className="bg-white rounded-2xl mr-3 overflow-hidden active:scale-95"
+                    style={{ width: 160 }}
+                    accessibilityLabel={plan.title}
+                  >
+                    <View className="h-28 bg-gray-200 items-center justify-center relative">
+                      <Folder size={32} color="#9CA3AF" />
                     </View>
-                 </View>
-                 <Text className="text-sm font-semibold text-gray-800 leading-tight" numberOfLines={2}>{playlist.title}</Text>
-                 <Text className="text-xs text-gray-500 mt-1">更新于昨天</Text>
-              </TouchableOpacity>
-            ))}
-             {/* Add New Button */}
-             <TouchableOpacity className="w-40 mr-3 h-24 border-2 border-dashed border-gray-300 rounded-xl items-center justify-center">
-                <Text className="text-gray-400 font-medium">+ 新建规划</Text>
-             </TouchableOpacity>
-          </ScrollView>
-        </View>
+                    <View className="p-3">
+                      <Text className="text-sm font-semibold text-gray-800 leading-snug mb-0.5" numberOfLines={2}>
+                        {plan.title}
+                      </Text>
+                      <Text className="text-xs text-gray-400">{plan.type}</Text>
+                    </View>
+                  </Pressable>
+                ))}
 
-        {/* 5. Menu Buttons - Horizontal Long Buttons */}
-        <View className="px-4 pb-10">
-           <View className="flex-col gap-3">
-              <TouchableOpacity className="w-full h-14 bg-white rounded-xl  flex-row items-center px-4">
-                 <FileText size={24} color="#000000" />
-                 <View className="ml-3 flex-1">
-                    <Text className="text-base font-semibold text-gray-800">文档集合</Text>
-                 </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity className="w-full h-14 bg-white rounded-xl  flex-row items-center px-4">
-                 <Bookmark size={24} color="#000000" />
-                 <View className="ml-3 flex-1">
-                    <Text className="text-base font-semibold text-gray-800">收藏集合</Text>
-                 </View>
-              </TouchableOpacity>
-           </View>
-        </View>
+                {/* 新建规划按钮 */}
+                <Pressable
+                  className="bg-white rounded-2xl border-2 border-dashed border-gray-300 active:scale-95"
+                  style={{ width: 160, height: 160 }}
+                  accessibilityLabel="新建规划"
+                >
+                  <View className="flex-1 items-center justify-center">
+                    <View className="w-12 h-12 rounded-full bg-gray-100 items-center justify-center mb-2">
+                      <Plus size={24} color="#6B7280" />
+                    </View>
+                    <Text className="text-sm font-medium text-gray-500">新建规划</Text>
+                  </View>
+                </Pressable>
+              </ScrollView>
+            </View>
 
+            {/* 功能菜单区 */}
+            <View className="px-4 pt-8 pb-6">
+              <View className="bg-white rounded-2xl overflow-hidden">
+                <TouchableOpacity
+                  className="flex-row items-center px-4 py-4 active:bg-gray-50"
+                  accessibilityLabel="文档集合"
+                >
+                  <FileText size={22} color="#374151" />
+                  <Text className="flex-1 ml-3 text-base font-medium text-gray-800">文档集合</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  className="flex-row items-center px-4 py-4 active:bg-gray-50"
+                  accessibilityLabel="收藏集合"
+                >
+                  <Bookmark size={22} color="#374151" />
+                  <Text className="flex-1 ml-3 text-base font-medium text-gray-800">收藏集合</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </>
+        )}
       </ScrollView>
-
     </SafeAreaView>
   );
 }

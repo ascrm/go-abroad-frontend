@@ -1,5 +1,5 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { Briefcase, Check, ChevronLeft, Circle, GraduationCap, Home, MapPin, Plane } from "lucide-react-native";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { Briefcase, Check, ChevronLeft, Circle, Flag, GraduationCap, Home, MapPin, Plane } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import { LayoutAnimation, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -32,10 +32,12 @@ export default function PlanDetailScreen() {
     }
   }, [id]);
 
-  // 首次加载
-  useEffect(() => {
-    loadPlanDetail();
-  }, [loadPlanDetail]);
+  // 首次加载/每次进入页面时刷新数据
+  useFocusEffect(
+    useCallback(() => {
+      loadPlanDetail();
+    }, [loadPlanDetail])
+  );
 
   const planType = (plan?.type || "tourism") as PlanType;
   const config = typeConfig[planType] || typeConfig.tourism;
@@ -77,14 +79,14 @@ export default function PlanDetailScreen() {
 
   const getPhaseProgress = (phase: Phase) => {
     const tasks = phase.tasks || [];
-    const completedCount = tasks.filter(t => t.isCompleted).length;
+    const completedCount = tasks.filter(t => t.status === 'completed').length;
     const total = tasks.length;
     return { completedCount, total, percentage: total > 0 ? Math.round((completedCount / total) * 100) : 0 };
   };
 
   const getOverallProgress = () => {
     const allTasks = phases.flatMap(p => p.tasks || []);
-    const completedTasks = allTasks.filter(t => t.isCompleted).length;
+    const completedTasks = allTasks.filter(t => t.status === 'completed').length;
     const totalTasks = allTasks.length;
     return { completedTasks, totalTasks, percentage: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0 };
   };
@@ -209,9 +211,17 @@ export default function PlanDetailScreen() {
 
                     {/* 阶段内容 */}
                     <View className="flex-1">
-                      <Text className="text-base font-semibold text-gray-900">
-                        {phase.title}
-                      </Text>
+                      <View className="flex-row items-center gap-2">
+                        <Text className="text-base font-semibold text-gray-900">
+                          {phase.title}
+                        </Text>
+                        {phase.is_milestone && (
+                          <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50">
+                            <Flag size={10} color="#F59E0B" />
+                            <Text className="text-xs font-medium text-amber-600">里程碑</Text>
+                          </View>
+                        )}
+                      </View>
                       {phase.description && (
                         <Text className="text-xs text-gray-500 mt-0.5">
                           {phase.description}
@@ -247,6 +257,7 @@ export default function PlanDetailScreen() {
                 {isExpanded && (
                   <View className="bg-white rounded-b-xl border-t border-gray-50">
                     {(phase.tasks || []).map((task) => {
+                      const isCompleted = task.status === 'completed';
                       return (
                         <TouchableOpacity
                           key={task.id}
@@ -259,10 +270,14 @@ export default function PlanDetailScreen() {
                             }
                           })}
                         >
-                          <Circle size={18} color="#D1D5DB" />
+                          {isCompleted ? (
+                            <Check size={18} color="#10B981" />
+                          ) : (
+                            <Circle size={18} color="#D1D5DB" />
+                          )}
                           <Text
                             className={`text-sm flex-1 ${
-                              task.isCompleted ? "text-gray-400 line-through" : "text-gray-700"
+                              isCompleted ? "text-gray-400 line-through" : "text-gray-700"
                             }`}
                           >
                             {task.title}
