@@ -57,7 +57,9 @@ export async function createPlan(data: CreatePlanParams): Promise<Plan> {
  * 更新规划
  */
 export async function updatePlan(data: UpdatePlanParams): Promise<Plan> {
-  return client.put(`${API_ENDPOINTS.plan.update}/${data.id}`, data);
+  return client.put(`${API_ENDPOINTS.plan.update}/${data.id}`, {
+    status: data.status,
+  });
 }
 
 /**
@@ -199,7 +201,7 @@ export async function deleteTask(id: number): Promise<void> {
  * 完成任务/取消完成
  */
 export async function completeTask(data: CompleteTaskParams): Promise<Task> {
-  return client.put(`${API_ENDPOINTS.plan.taskComplete}/${data.id}/complete`, { isCompleted: data.isCompleted });
+  return client.put(`${API_ENDPOINTS.plan.taskComplete}/${data.id}/complete`, { status: data.status });
 }
 
 /**

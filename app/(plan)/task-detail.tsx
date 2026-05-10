@@ -1,10 +1,12 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { BookOpen, Briefcase, Calculator, ChevronLeft, ExternalLink, FileText, Globe, GraduationCap, Home, Plane, Sparkles } from "lucide-react-native";
+import { BookOpen, Briefcase, Calculator, ChevronLeft, Clock, Edit2, ExternalLink, FileText, Globe, GraduationCap, Home, Paperclip, Plane, Sparkles, Calendar, AlertCircle, Eye } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
-import { Linking, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Linking, ScrollView, Text, TouchableOpacity, View, Alert, Platform, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import * as planApi from "@/src/api/plan";
-import type { Task } from "@/src/types/plan";
+import * as FileSystem from "expo-file-system/legacy";
+import type { Attachment, Task, TaskPriority, TaskStatus } from "@/src/types/plan";
 
 const typeConfig = {
   tourism: { icon: Plane, label: "旅游规划", color: "#3B82F6", bgColor: "#EBF5FF" },
@@ -13,18 +15,48 @@ const typeConfig = {
   immigration: { icon: Home, label: "定居规划", color: "#10B981", bgColor: "#ECFDF5" },
 };
 
+const statusConfig: Record<TaskStatus, { label: string; color: string; bgColor: string }> = {
+  pending: { label: "待开始", color: "#6B7280", bgColor: "#F3F4F6" },
+  in_progress: { label: "进行中", color: "#3B82F6", bgColor: "#EBF5FF" },
+  completed: { label: "已完成", color: "#10B981", bgColor: "#ECFDF5" },
+};
+
+const priorityConfig: Record<TaskPriority, { label: string; color: string; bgColor: string }> = {
+  low: { label: "低", color: "#10B981", bgColor: "#ECFDF5" },
+  medium: { label: "中", color: "#F59E0B", bgColor: "#FFFBEB" },
+  high: { label: "高", color: "#EF4444", bgColor: "#FEF2F2" },
+};
+
 const iconMap: Record<string, any> = {
   Plane, Globe, Calculator, BookOpen, FileText, GraduationCap, Briefcase, Home
 };
 
-const defaultTaskDetail = {
-  description: "这是一个待完成的任务，请按照规划完成相关步骤。",
-  tips: [
-    "仔细阅读任务要求",
-    "按步骤完成各项准备",
-    "如有疑问可咨询专业人士"
-  ],
-  quickLinks: []
+// iconMap 已预留用于快捷入口功能
+
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return null;
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
+  } catch {
+    return dateStr;
+  }
+};
+
+const formatDateTime = (dateStr?: string) => {
+  if (!dateStr) return null;
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("zh-CN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  } catch {
+    return dateStr;
+  }
 };
 
 export default function TaskDetailScreen() {
@@ -33,6 +65,9 @@ export default function TaskDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [aiSuggestionLoading, setAiSuggestionLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
+  const [reminderLoading, setReminderLoading] = useState(false);
+  const [tempReminderDate, setTempReminderDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // 加载任务详情
   const loadTaskDetail = useCallback(async () => {
@@ -41,7 +76,6 @@ export default function TaskDetailScreen() {
     try {
       const data = await planApi.getTaskDetail(Number(id));
       setTask(data);
-      // 如果有 AI 建议则显示
       if (data.aiSuggestion) {
         setAiSuggestion(data.aiSuggestion);
       }
@@ -64,7 +98,6 @@ export default function TaskDetailScreen() {
     try {
       const response = await planApi.getTaskAISuggestion(Number(id));
       setAiSuggestion(response.suggestion);
-      // 更新任务数据
       setTask(prev => prev ? { ...prev, aiSuggestion: response.suggestion } : null);
     } catch (error) {
       console.error("获取 AI 建议失败:", error);
@@ -73,11 +106,65 @@ export default function TaskDetailScreen() {
     }
   };
 
+  // 更新提醒时间
+  const handleUpdateReminderTime = async (date: Date) => {
+    if (!id || !task) return;
+    setReminderLoading(true);
+    try {
+      const reminderTime = date.toISOString();
+      const updated = await planApi.updateTask({
+        id: Number(id),
+        reminderTime,
+      });
+      setTask(prev => prev ? { ...prev, reminderTime: updated.reminderTime } : null);
+    } catch (error) {
+      console.error("更新提醒时间失败:", error);
+      Alert.alert("更新失败", "无法保存提醒时间，请重试");
+    } finally {
+      setReminderLoading(false);
+    }
+  };
+
   const handleOpenLink = async (url: string) => {
     try {
       await Linking.openURL(url);
     } catch (error) {
       console.error("无法打开链接:", error);
+    }
+  };
+
+  // 附件预览/下载
+  const handleAttachmentPress = async (attachment: Attachment) => {
+    try {
+      const fileUri = `${FileSystem.documentDirectory}${attachment.name}`;
+
+      // 下载文件到本地
+      const downloadResult = await FileSystem.downloadAsync(attachment.url, fileUri);
+
+      if (downloadResult.uri) {
+        // 根据文件类型选择打开方式
+        const isImage = attachment.type?.startsWith("image/") ||
+          /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(attachment.name);
+        const isPdf = attachment.type === "application/pdf" || attachment.name.toLowerCase().endsWith(".pdf");
+
+        if (isImage || isPdf) {
+          // 对于图片和PDF，使用 Linking 打开
+          await Linking.openURL(downloadResult.uri);
+        } else {
+          // 对于其他文件，显示一个选项菜单
+          Alert.alert(
+            attachment.name,
+            "文件已下载到本地",
+            [
+              { text: "用其他应用打开", onPress: () => Linking.openURL(downloadResult.uri) },
+              { text: "关闭", style: "cancel" }
+            ]
+          );
+        }
+      }
+    } catch (error) {
+      console.error("打开附件失败:", error);
+      Alert.alert("打开失败", "无法打开附件，请检查网络连接后重试");
     }
   };
 
@@ -96,19 +183,12 @@ export default function TaskDetailScreen() {
     );
   }
 
-  // 如果没有预设的详细数据，使用任务自带的 description
-  const taskDetail = {
-    description: task.description || defaultTaskDetail.description,
-    tips: task.aiSuggestion ? task.aiSuggestion.split('\n').filter(t => t.trim()) : defaultTaskDetail.tips,
-    quickLinks: task.quickEntries?.map(entry => ({
-      label: entry.title,
-      url: entry.url,
-      icon: entry.icon || "Globe"
-    })) || []
-  };
-
   const config = typeConfig.tourism;
   const typeLabel = config.label;
+  const taskStatus = task.status || "pending";
+  const taskPriority = task.priority || "medium";
+  const taskStatusInfo = statusConfig[taskStatus];
+  const taskPriorityInfo = priorityConfig[taskPriority];
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-gray-50">
@@ -124,32 +204,131 @@ export default function TaskDetailScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* 基本信息 */}
         <View className="bg-white mx-4 mt-4 rounded-2xl p-5">
-          <View className="flex-row items-center gap-2 mb-3">
+          <View className="flex-row items-center gap-2 mb-3 flex-wrap">
             <View className="px-2 py-1 bg-green-50 rounded-md">
               <Text className="text-xs font-medium text-green-700">{typeLabel}</Text>
             </View>
-            {task.isCompleted && (
-              <View className="px-2 py-1 bg-blue-50 rounded-md">
-                <Text className="text-xs font-medium text-blue-700">已完成</Text>
-              </View>
-            )}
+            <View className={`px-2 py-1 rounded-md`} style={{ backgroundColor: taskStatusInfo.bgColor }}>
+              <Text className="text-xs font-medium" style={{ color: taskStatusInfo.color }}>{taskStatusInfo.label}</Text>
+            </View>
+            <View className={`px-2 py-1 rounded-md`} style={{ backgroundColor: taskPriorityInfo.bgColor }}>
+              <Text className="text-xs font-medium" style={{ color: taskPriorityInfo.color }}>{taskPriorityInfo.label}优先级</Text>
+            </View>
           </View>
           <Text className="text-xl font-bold text-gray-900 mb-2">{task.title}</Text>
           {task.description && (
-            <Text className="text-sm text-gray-500">{task.description}</Text>
+            <Text className="text-sm text-gray-500 leading-6">{task.description}</Text>
           )}
         </View>
 
-        {/* 任务说明 */}
+        {/* 日期信息 */}
         <View className="bg-white mx-4 mt-3 rounded-2xl p-5">
-          <View className="flex-row items-center gap-2 mb-3">
-            <Sparkles size={18} color="#10B981" />
-            <Text className="text-base font-semibold text-gray-900">任务说明</Text>
+          <View className="flex-row items-center gap-2 mb-4">
+            <Calendar size={18} color="#3B82F6" />
+            <Text className="text-base font-semibold text-gray-900">日期信息</Text>
           </View>
-          <Text className="text-sm text-gray-600 leading-6">
-            {taskDetail.description}
-          </Text>
+          <View className="gap-3">
+            {task.startDate && (
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center gap-2">
+                  <View className="w-8 h-8 rounded-lg bg-blue-50 items-center justify-center">
+                    <Calendar size={16} color="#3B82F6" />
+                  </View>
+                  <Text className="text-sm text-gray-500">开始日期</Text>
+                </View>
+                <Text className="text-sm font-medium text-gray-900">{formatDate(task.startDate)}</Text>
+              </View>
+            )}
+            {task.endDate && (
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center gap-2">
+                  <View className="w-8 h-8 rounded-lg bg-orange-50 items-center justify-center">
+                    <Calendar size={16} color="#F59E0B" />
+                  </View>
+                  <Text className="text-sm text-gray-500">结束日期</Text>
+                </View>
+                <Text className="text-sm font-medium text-gray-900">{formatDate(task.endDate)}</Text>
+              </View>
+            )}
+            {task.planDate && (
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center gap-2">
+                  <View className="w-8 h-8 rounded-lg bg-purple-50 items-center justify-center">
+                    <Sparkles size={16} color="#8B5CF6" />
+                  </View>
+                  <Text className="text-sm text-gray-500">计划日期</Text>
+                </View>
+                <Text className="text-sm font-medium text-gray-900">{formatDate(task.planDate)}</Text>
+              </View>
+            )}
+            {/* 提醒时间 - 可点击编辑 */}
+            <TouchableOpacity
+              className="flex-row items-center justify-between"
+              onPress={() => {
+                // 初始化临时日期为当前提醒时间或现在+1小时
+                const initialDate = task.reminderTime
+                  ? new Date(task.reminderTime)
+                  : new Date(Date.now() + 60 * 60 * 1000);
+                setTempReminderDate(initialDate);
+                setShowDatePicker(true);
+              }}
+              activeOpacity={0.7}
+            >
+              <View className="flex-row items-center gap-2">
+                <View className="w-8 h-8 rounded-lg bg-red-50 items-center justify-center">
+                  <Clock size={16} color="#EF4444" />
+                </View>
+                <Text className="text-sm text-gray-500">提醒时间</Text>
+              </View>
+              <View className="flex-row items-center gap-2">
+                <Text className="text-sm font-medium text-gray-900">
+                  {task.reminderTime ? formatDateTime(task.reminderTime) : "未设置"}
+                </Text>
+                <Edit2 size={14} color="#9CA3AF" />
+              </View>
+            </TouchableOpacity>
+            {!task.startDate && !task.endDate && !task.planDate && !task.reminderTime && (
+              <Text className="text-sm text-gray-400">暂无日期信息</Text>
+            )}
+          </View>
         </View>
+
+        {/* 附件 */}
+        {task.attachments && task.attachments.length > 0 && (
+          <View className="bg-white mx-4 mt-3 rounded-2xl p-5">
+            <View className="flex-row items-center gap-2 mb-4">
+              <Paperclip size={18} color="#3B82F6" />
+              <Text className="text-base font-semibold text-gray-900">附件</Text>
+              <Text className="text-xs text-gray-400 ml-1">({task.attachments.length})</Text>
+            </View>
+            <View className="gap-3">
+              {task.attachments.map((attachment: Attachment, index: number) => (
+                <TouchableOpacity
+                  key={index}
+                  className="flex-row items-center justify-between p-4 bg-gray-50 rounded-xl"
+                  activeOpacity={0.7}
+                  onPress={() => handleAttachmentPress(attachment)}
+                >
+                  <View className="flex-row items-center gap-3 flex-1">
+                    <View className="w-10 h-10 bg-white rounded-lg items-center justify-center">
+                      <FileText size={20} color="#3B82F6" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-sm font-medium text-gray-900" numberOfLines={1}>{attachment.name}</Text>
+                      {attachment.type && (
+                        <Text className="text-xs text-gray-400 mt-0.5">{attachment.type}</Text>
+                      )}
+                    </View>
+                  </View>
+                  <View className="flex-row items-center gap-1">
+                    <Eye size={16} color="#3B82F6" />
+                    <ExternalLink size={18} color="#9CA3AF" />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* AI 建议 */}
         <View className="bg-white mx-4 mt-3 rounded-2xl p-5">
@@ -182,44 +361,75 @@ export default function TaskDetailScreen() {
               ))}
             </View>
           ) : (
-            <Text className="text-sm text-gray-400">点击获取建议获取 AI 智能建议</Text>
+            <View className="flex-row items-center gap-2 py-4">
+              <AlertCircle size={16} color="#D1D5DB" />
+              <Text className="text-sm text-gray-400">点击"获取建议"按钮获取 AI 智能建议</Text>
+            </View>
           )}
         </View>
-
-        {/* 快捷入口 */}
-        {taskDetail.quickLinks.length > 0 && (
-          <View className="bg-white mx-4 mt-3 rounded-2xl p-5 mb-20">
-            <View className="flex-row items-center gap-2 mb-4">
-              <ExternalLink size={18} color="#3B82F6" />
-              <Text className="text-base font-semibold text-gray-900">快捷入口</Text>
-            </View>
-            <View className="gap-3">
-              {taskDetail.quickLinks.map((link: any, index: number) => {
-                const IconComponent = iconMap[link.icon] || Globe;
-                return (
-                  <TouchableOpacity
-                    key={index}
-                    className="flex-row items-center justify-between p-4 bg-gray-50 rounded-xl"
-                    activeOpacity={0.7}
-                    onPress={() => handleOpenLink(link.url)}
-                  >
-                    <View className="flex-row items-center gap-3">
-                      <View className="w-10 h-10 bg-white rounded-lg items-center justify-center">
-                        <IconComponent size={20} color="#3B82F6" />
-                      </View>
-                      <Text className="text-base font-medium text-gray-900">{link.label}</Text>
-                    </View>
-                    <ExternalLink size={18} color="#9CA3AF" />
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        )}
 
         {/* 底部空隙 */}
         <View className="h-10" />
       </ScrollView>
+
+      {/* 提醒时间选择器 */}
+      {showDatePicker && Platform.OS === 'android' && (
+        <DateTimePicker
+          value={tempReminderDate || new Date()}
+          mode="datetime"
+          display="default"
+          onChange={(event: DateTimePickerEvent, date?: Date) => {
+            setShowDatePicker(false);
+            if (event.type === 'set' && date) {
+              handleUpdateReminderTime(date);
+            }
+          }}
+          minimumDate={new Date()}
+        />
+      )}
+      {showDatePicker && Platform.OS === 'ios' && (
+        <View style={StyleSheet.absoluteFill}>
+          <TouchableOpacity
+            style={{ flex: 1, justifyContent: 'flex-end' }}
+            activeOpacity={1}
+            onPress={() => setShowDatePicker(false)}
+          >
+            <View style={{ backgroundColor: 'rgba(0,0,0,0.5)', flex: 1 }} />
+          </TouchableOpacity>
+          <View style={{ backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 48 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <Text style={{ fontSize: 16, color: '#6B7280' }}>取消</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 18, fontWeight: '600', color: '#111827' }}>设置提醒时间</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  if (tempReminderDate) {
+                    handleUpdateReminderTime(tempReminderDate);
+                  }
+                  setShowDatePicker(false);
+                }}
+                disabled={reminderLoading || !tempReminderDate}
+              >
+                <Text style={{ fontSize: 16, color: '#8B5CF6', fontWeight: '500' }}>
+                  {reminderLoading ? "保存中..." : "保存"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <DateTimePicker
+              value={tempReminderDate || new Date()}
+              mode="datetime"
+              display="spinner"
+              onChange={(event: DateTimePickerEvent, date?: Date) => {
+                if (date) {
+                  setTempReminderDate(date);
+                }
+              }}
+              minimumDate={new Date()}
+            />
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }

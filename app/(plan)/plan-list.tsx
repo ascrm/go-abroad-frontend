@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Calendar1, ChevronLeft, Clock, MapPin, Plane,
-  GraduationCap, Briefcase, Home, Plus, List, Trash2, Archive, Play, X
+  GraduationCap, Briefcase, Home, Plus, List, Trash2, Archive, Play, Pause, X
 } from "lucide-react-native";
 import * as planApi from "@/src/api/plan";
 import { usePlanStore } from "@/src/stores/planStore";
@@ -45,11 +45,12 @@ const typeConfig: Record<string, { icon: any; label: string; color: string; bg: 
   immigration: { icon: Home, label: "定居", color: "#10B981", bg: "rgba(16, 185, 129, 0.08)" },
 };
 
-const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
-  completed: { label: "已完成", bg: "#ECFDF5", text: "#059669" },
-  generating: { label: "进行中", bg: "#EFF6FF", text: "#2563EB" },
-  draft: { label: "待开始", bg: "#FEF3C7", text: "#D97706" },
-  archived: { label: "已归档", bg: "#F1F5F9", text: "#64748B" },
+const statusConfig: Record<string, { label: string; bg: string; text: string; borderColor: string }> = {
+  completed: { label: "已完成", bg: "#F1F5F9", text: "#0F172A", borderColor: "#0F172A" },
+  generating: { label: "进行中", bg: "#ECFDF5", text: "#059669", borderColor: "#059669" },
+  draft: { label: "待开始", bg: "#FEF3C7", text: "#D97706", borderColor: "#D97706" },
+  paused: { label: "已暂停", bg: "#FEF2F2", text: "#DC2626", borderColor: "#DC2626" },
+  archived: { label: "已归档", bg: "#F1F5F9", text: "#64748B", borderColor: "#64748B" },
 };
 
 type FilterKey = "all" | "generating" | "draft" | "completed" | "archived";
@@ -58,7 +59,7 @@ const filterStats: { key: FilterKey; label: string; colorKey: keyof typeof COLOR
   { key: "all", label: "全部", colorKey: "primary" },
   { key: "generating", label: "进行中", colorKey: "info" },
   { key: "draft", label: "待开始", colorKey: "warning" },
-  { key: "completed", label: "已完成", colorKey: "success" },
+  { key: "completed", label: "已完成", colorKey: "textMuted" },
 ];
 
 // ============================================
@@ -68,13 +69,15 @@ function PlanCard({
   plan,
   onPress,
   onStart,
-  onArchive,
+  onPause,
+  onResume,
   onDelete,
 }: {
   plan: Plan;
   onPress?: (plan: Plan) => void;
   onStart?: (plan: Plan) => void;
-  onArchive?: (plan: Plan) => void;
+  onPause?: (plan: Plan) => void;
+  onResume?: (plan: Plan) => void;
   onDelete?: (plan: Plan) => void;
 }) {
   const config = typeConfig[plan.type as PlanType] || typeConfig.tourism;
@@ -93,7 +96,7 @@ function PlanCard({
       onPress={() => onPress?.(plan)}
     >
       {/* 左侧类型标识条 */}
-      <View style={[styles.cardLeftBar, { backgroundColor: config.color }]} />
+      <View style={[styles.cardLeftBar, { backgroundColor: status.borderColor }]} />
 
       <View style={styles.cardBody}>
         {/* 头部：类型 + 状态 */}
@@ -143,37 +146,85 @@ function PlanCard({
           {/* 操作按钮 */}
           <View style={styles.cardActions}>
             {plan.status === "draft" && (
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: COLORS.primary }]}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onStart?.(plan);
-                }}
-              >
-                <Play size={12} color="#FFFFFF" />
-                <Text style={styles.actionBtnText}>开始</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: COLORS.primary }]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onStart?.(plan);
+                  }}
+                >
+                  <Play size={12} color="#FFFFFF" />
+                  <Text style={styles.actionBtnText}>开始</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: COLORS.muted }]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onDelete?.(plan);
+                  }}
+                >
+                  <Trash2 size={12} color={COLORS.destructive} />
+                </TouchableOpacity>
+              </>
             )}
-            {plan.status !== "archived" && (
+            {plan.status === "generating" && (
+              <>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: COLORS.destructive }]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onPause?.(plan);
+                  }}
+                >
+                  <Pause size={12} color="#FFFFFF" />
+                  <Text style={styles.actionBtnText}>暂停</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: COLORS.muted }]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onDelete?.(plan);
+                  }}
+                >
+                  <Trash2 size={12} color={COLORS.destructive} />
+                </TouchableOpacity>
+              </>
+            )}
+            {plan.status === "paused" && (
+              <>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: COLORS.primary }]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onResume?.(plan);
+                  }}
+                >
+                  <Play size={12} color="#FFFFFF" />
+                  <Text style={styles.actionBtnText}>继续</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: COLORS.muted }]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onDelete?.(plan);
+                  }}
+                >
+                  <Trash2 size={12} color={COLORS.destructive} />
+                </TouchableOpacity>
+              </>
+            )}
+            {plan.status === "completed" && (
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: COLORS.muted }]}
                 onPress={(e) => {
                   e.stopPropagation();
-                  onArchive?.(plan);
+                  onDelete?.(plan);
                 }}
               >
-                <Archive size={12} color={COLORS.textSecondary} />
+                <Trash2 size={12} color={COLORS.destructive} />
               </TouchableOpacity>
             )}
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: COLORS.muted }]}
-              onPress={(e) => {
-                e.stopPropagation();
-                onDelete?.(plan);
-              }}
-            >
-              <Trash2 size={12} color={COLORS.destructive} />
-            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -196,11 +247,13 @@ export default function PlanListScreen() {
 
   const filteredPlans = activeFilter === "all"
     ? plans
-    : plans.filter(p => p.status === activeFilter);
+    : activeFilter === "generating"
+      ? plans.filter(p => p.status === "generating" || p.status === "paused")
+      : plans.filter(p => p.status === activeFilter);
 
   const stats = {
     all: plans.length,
-    generating: plans.filter(p => p.status === "generating").length,
+    generating: plans.filter(p => p.status === "generating" || p.status === "paused").length,
     draft: plans.filter(p => p.status === "draft").length,
     completed: plans.filter(p => p.status === "completed").length,
   };
@@ -218,18 +271,16 @@ export default function PlanListScreen() {
     });
   };
 
-  const handleArchive = async (plan: Plan) => {
-    Alert.alert("确认归档", `确定要归档规划「${plan.title}」吗？`, [
-      { text: "取消", style: "cancel" },
-      {
-        text: "归档",
-        onPress: async () => {
-          await planApi.updatePlan({ id: plan.id, status: "archived" }).then((data) => {
-            if (data) updatePlan({ ...plan, status: "archived" });
-          });
-        },
-      },
-    ]);
+  const handlePause = async (plan: Plan) => {
+    await planApi.updatePlan({ id: plan.id, status: "paused" }).then((data) => {
+      if (data) updatePlan({ ...plan, status: "paused" });
+    });
+  };
+
+  const handleResume = async (plan: Plan) => {
+    await planApi.updatePlan({ id: plan.id, status: "generating" }).then((data) => {
+      if (data) updatePlan({ ...plan, status: "generating" });
+    });
   };
 
   const handleDelete = (plan: Plan) => {
@@ -334,7 +385,8 @@ export default function PlanListScreen() {
             plan={item}
             onPress={handlePlanPress}
             onStart={handleStart}
-            onArchive={handleArchive}
+            onPause={handlePause}
+            onResume={handleResume}
             onDelete={handleDelete}
           />
         )}

@@ -1,10 +1,10 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { Briefcase, Check, CheckCircle2, ChevronLeft, Circle, GraduationCap, Home, MapPin, MoreVertical, Plane, Share2 } from "lucide-react-native";
+import { Briefcase, Check, ChevronLeft, Circle, GraduationCap, Home, MapPin, Plane } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { LayoutAnimation, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as planApi from "@/src/api/plan";
-import type { Plan, Phase, Task, PlanType } from "@/src/types/plan";
+import type { Plan, Phase, PlanType } from "@/src/types/plan";
 
 const typeConfig = {
   tourism: { icon: Plane, label: "旅游", color: "#3B82F6", bgColor: "#EBF5FF" },
@@ -55,6 +55,17 @@ export default function PlanDetailScreen() {
   }, [phases]);
 
   const togglePhase = (phaseId: number) => {
+    LayoutAnimation.configureNext({
+      duration: 300,
+      create: {
+        type: LayoutAnimation.Types.easeInEaseOut,
+        property: LayoutAnimation.Properties.opacity,
+      },
+      delete: {
+        type: LayoutAnimation.Types.easeInEaseOut,
+        property: LayoutAnimation.Properties.opacity,
+      },
+    });
     const newExpanded = new Set(expandedPhases);
     if (newExpanded.has(phaseId)) {
       newExpanded.delete(phaseId);
@@ -62,31 +73,6 @@ export default function PlanDetailScreen() {
       newExpanded.add(phaseId);
     }
     setExpandedPhases(newExpanded);
-  };
-
-  // 切换任务完成状态
-  const handleToggleTask = async (task: Task) => {
-    try {
-      await planApi.completeTask({
-        id: task.id,
-        isCompleted: !task.isCompleted,
-      });
-      // 更新本地状态
-      setPlan(prev => {
-        if (!prev || !prev.phases) return prev;
-        return {
-          ...prev,
-          phases: prev.phases.map(phase => ({
-            ...phase,
-            tasks: phase.tasks?.map(t =>
-              t.id === task.id ? { ...t, isCompleted: !t.isCompleted } : t
-            ),
-          })),
-        };
-      });
-    } catch (error) {
-      console.error("更新任务状态失败:", error);
-    }
   };
 
   const getPhaseProgress = (phase: Phase) => {
@@ -128,14 +114,7 @@ export default function PlanDetailScreen() {
           <ChevronLeft size={24} color="#374151" />
         </TouchableOpacity>
         <Text className="text-lg font-semibold text-gray-900">规划详情</Text>
-        <View className="flex-row gap-2">
-          <TouchableOpacity className="p-1">
-            <Share2 size={20} color="#374151" />
-          </TouchableOpacity>
-          <TouchableOpacity className="p-1">
-            <MoreVertical size={20} color="#374151" />
-          </TouchableOpacity>
-        </View>
+        <View className="w-6" />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -269,41 +248,26 @@ export default function PlanDetailScreen() {
                   <View className="bg-white rounded-b-xl border-t border-gray-50">
                     {(phase.tasks || []).map((task) => {
                       return (
-                        <View
+                        <TouchableOpacity
                           key={task.id}
                           className="flex-row items-center gap-3 px-4 py-3 border-b border-gray-50"
+                          activeOpacity={0.7}
+                          onPress={() => router.push({
+                            pathname: "/(plan)/task-detail",
+                            params: {
+                              id: String(task.id),
+                            }
+                          })}
                         >
-                          {/* 点击 icon 切换完成状态 */}
-                          <TouchableOpacity
-                            activeOpacity={0.7}
-                            onPress={() => handleToggleTask(task)}
+                          <Circle size={18} color="#D1D5DB" />
+                          <Text
+                            className={`text-sm flex-1 ${
+                              task.isCompleted ? "text-gray-400 line-through" : "text-gray-700"
+                            }`}
                           >
-                            {task.isCompleted ? (
-                              <CheckCircle2 size={20} color="#10B981" />
-                            ) : (
-                              <Circle size={20} color="#D1D5DB" />
-                            )}
-                          </TouchableOpacity>
-                          {/* 点击文字进入任务详情 */}
-                          <TouchableOpacity
-                            className="flex-1"
-                            activeOpacity={0.7}
-                            onPress={() => router.push({
-                              pathname: "/(plan)/task-detail",
-                              params: {
-                                id: String(task.id),
-                              }
-                            })}
-                          >
-                            <Text
-                              className={`text-sm ${
-                                task.isCompleted ? "text-gray-400 line-through" : "text-gray-700"
-                              }`}
-                            >
-                              {task.title}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
+                            {task.title}
+                          </Text>
+                        </TouchableOpacity>
                       );
                     })}
                   </View>

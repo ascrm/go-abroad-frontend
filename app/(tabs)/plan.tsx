@@ -1,266 +1,450 @@
 import * as planApi from "@/src/api/plan";
-import { usePlanStore } from "@/src/stores/planStore";
 import type { Plan, Phase, Task } from "@/src/types/plan";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useCallback, useState, useRef, useEffect } from "react";
+import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import PlanEmptyState from "../../components/page/plan/PlanEmptyState";
+import { usePlanStore } from "@/src/stores/planStore";
 import {
-  Calendar1, MapPin, Plane, GraduationCap, Briefcase, Home,
-  ChevronRight, Plus, Check, Circle, Target, Clock,
-  Sparkles, ArrowRight
+  MapPin, Plane, GraduationCap, Briefcase, Home,
+  ChevronRight, Check, Target, Sparkles, Bell, Trophy
 } from "lucide-react-native";
 import { formatDate } from "@/src/utils/time";
 
 // ============================================
-// Design System - Soft UI Evolution
+// Design System - Monochrome with Animation
 // ============================================
 const COLORS = {
-  primary: "#0D9488",
+  primary: "#18181B",
   onPrimary: "#FFFFFF",
-  secondary: "#14B8A6",
-  accent: "#F59E0B",
-  background: "#F8FAFC",
-  foreground: "#0F172A",
-  muted: "#F1F5F9",
-  border: "#E2E8F0",
+  secondary: "#27272A",
+  accent: "#3F3F46",
+  background: "#FAFAFA",
+  foreground: "#0A0A0A",
+  muted: "#F4F4F5",
+  border: "#E4E4E7",
   cardBg: "#FFFFFF",
-  textPrimary: "#0F172A",
-  textSecondary: "#475569",
-  textMuted: "#94A3B8",
-  destructive: "#DC2626",
-  success: "#059669",
-  successLight: "#ECFDF5",
-  warning: "#D97706",
-  warningLight: "#FEF3C7",
-  info: "#2563EB",
-  infoLight: "#EFF6FF",
+  textPrimary: "#18181B",
+  textSecondary: "#52525B",
+  textMuted: "#A1A1AA",
+  destructive: "#18181B",
+  success: "#22C55E",
+  successLight: "#F0FDF4",
+  warning: "#71717A",
+  warningLight: "#F4F4F5",
+  info: "#3F3F46",
+  infoLight: "#F4F4F5",
 };
 
+// ============================================
+// 骨架屏组件 - 让加载更丝滑
+// ============================================
+function SkeletonCard() {
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  const opacity = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.4, 1],
+  });
+
+  return (
+    <View style={styles.skeletonCard}>
+      <View style={styles.skeletonContent}>
+        <View style={styles.skeletonHeader}>
+          <Animated.View style={[styles.skeletonBadge, { opacity }]} />
+          <Animated.View style={[styles.skeletonBadgeSmall, { opacity }]} />
+        </View>
+        <Animated.View style={[styles.skeletonTitle, { opacity }]} />
+        <Animated.View style={[styles.skeletonSubtitle, { opacity }]} />
+        <Animated.View style={[styles.skeletonProgress, { opacity }]} />
+        <View style={styles.skeletonStats}>
+          <Animated.View style={[styles.skeletonStat, { opacity }]} />
+          <Animated.View style={[styles.skeletonStat, { opacity }]} />
+          <Animated.View style={[styles.skeletonStat, { opacity }]} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function SkeletonPhaseCard() {
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  const opacity = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.35, 1],
+  });
+
+  return (
+    <View style={styles.skeletonPhaseCard}>
+      <View style={styles.skeletonTabs}>
+        {[1, 2, 3].map((i) => (
+          <Animated.View key={i} style={[styles.skeletonTab, { opacity }]} />
+        ))}
+      </View>
+      <View style={styles.skeletonTasks}>
+        {[1, 2, 3, 4].map((i) => (
+          <View key={i} style={styles.skeletonTaskRow}>
+            <Animated.View style={[styles.skeletonTaskDot, { opacity }]} />
+            <Animated.View style={[styles.skeletonTaskText, { opacity }]} />
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 const typeConfig: Record<string, { icon: any; label: string; color: string; bg: string }> = {
-  tourism: { icon: Plane, label: "旅游", color: "#3B82F6", bg: "rgba(59, 130, 246, 0.08)" },
-  study: { icon: GraduationCap, label: "留学", color: "#8B5CF6", bg: "rgba(139, 92, 246, 0.08)" },
-  work: { icon: Briefcase, label: "工作", color: "#F59E0B", bg: "rgba(245, 158, 11, 0.08)" },
-  immigration: { icon: Home, label: "定居", color: "#10B981", bg: "rgba(16, 185, 129, 0.08)" },
+  tourism: { icon: Plane, label: "旅游", color: "#18181B", bg: "#F4F4F5" },
+  study: { icon: GraduationCap, label: "留学", color: "#18181B", bg: "#F4F4F5" },
+  work: { icon: Briefcase, label: "工作", color: "#18181B", bg: "#F4F4F5" },
+  immigration: { icon: Home, label: "定居", color: "#18181B", bg: "#F4F4F5" },
 };
 
 const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
-  completed: { label: "已完成", bg: "#ECFDF5", text: "#059669" },
-  generating: { label: "进行中", bg: "#EFF6FF", text: "#2563EB" },
-  draft: { label: "待开始", bg: "#FEF3C7", text: "#D97706" },
-  archived: { label: "已归档", bg: "#F1F5F9", text: "#64748B" },
+  completed: { label: "已完成", bg: "#F0FDF4", text: "#22C55E" },
+  generating: { label: "进行中", bg: "#F0FDF4", text: "#22C55E" },
+  paused: { label: "已暂停", bg: "#FEF2F2", text: "#DC2626" },
+  draft: { label: "待开始", bg: "#F4F4F5", text: "#71717A" },
+  archived: { label: "已归档", bg: "#F4F4F5", text: "#A1A1AA" },
 };
 
 // ============================================
-// 子组件
+// 子组件 - 带动画的Tab切换器
 // ============================================
-
-// 阶段概览组件
-function PhaseOverview({ phases, planTypeColor }: {
+function PhaseTabSwitcher({ phases, selectedPhaseId, onPhaseSelect }: {
   phases: Phase[];
-  planTypeColor: string;
+  selectedPhaseId: number | null;
+  onPhaseSelect: (phaseId: number) => void;
 }) {
-  const getPhaseStatus = (phase: Phase, index: number, prevCompleted: number) => {
-    if (!phase.tasks || phase.tasks.length === 0) return "pending";
-    const completed = phase.tasks.filter(t => t.isCompleted).length;
-    if (completed === phase.tasks.length) return "completed";
-    if (index === 0 || prevCompleted > 0) return "active";
-    return "pending";
+  const [tabLayouts, setTabLayouts] = useState<Record<number, { x: number; width: number }>>({});
+  const indicatorPosition = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const selectedLayout = tabLayouts[selectedPhaseId || 0];
+    if (selectedLayout) {
+      Animated.spring(indicatorPosition, {
+        toValue: selectedLayout.x + selectedLayout.width / 2 - 20,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 12,
+      }).start();
+    }
+  }, [selectedPhaseId, tabLayouts, indicatorPosition]);
+
+  const handleLayout = (phaseId: number, event: any) => {
+    const { x, width } = event.nativeEvent.layout;
+    setTabLayouts(prev => ({ ...prev, [phaseId]: { x, width } }));
   };
 
   return (
-    <View style={styles.phaseOverviewContainer}>
-      <Text style={styles.sectionTitle}>阶段进度</Text>
-      <View style={styles.phasesRow}>
-        {phases.map((phase, index) => {
-          const prevCompleted = phases.slice(0, index).reduce(
-            (sum, p) => sum + (p.tasks?.filter(t => t.isCompleted).length || 0), 0
-          );
-          const phaseCompleted = phase.tasks?.filter(t => t.isCompleted).length || 0;
-          const status = getPhaseStatus(phase, index, prevCompleted);
-
+    <View style={styles.tabContainer}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
+        {phases.map((phase) => {
+          const isSelected = phase.id === selectedPhaseId;
           return (
-            <View key={phase.id} style={styles.phaseItem}>
-              <View style={[
-                styles.phaseIconWrapper,
-                {
-                  backgroundColor: status === "completed" ? COLORS.successLight
-                    : status === "active" ? `${planTypeColor}15`
-                    : COLORS.muted
-                }
-              ]}>
-                {status === "completed" ? (
-                  <Check size={18} color={COLORS.success} strokeWidth={2.5} />
-                ) : (
-                  <Circle
-                    size={18}
-                    color={status === "active" ? planTypeColor : COLORS.textMuted}
-                    strokeWidth={status === "active" ? 2.5 : 2}
-                  />
-                )}
-              </View>
+            <TouchableOpacity
+              key={phase.id}
+              style={styles.tabItem}
+              onPress={() => onPhaseSelect(phase.id)}
+              onLayout={(e) => handleLayout(phase.id, e)}
+              activeOpacity={0.7}
+              accessibilityRole="tab"
+              accessibilityState={isSelected ? { selected: true } : {}}
+              accessibilityLabel={`阶段: ${phase.title}`}
+            >
               <Text style={[
-                styles.phaseLabel,
-                { color: status === "completed" ? COLORS.success
-                  : status === "active" ? COLORS.textPrimary
-                  : COLORS.textMuted }
-              ]} numberOfLines={1}>
-                {phase.title.length > 4 ? phase.title.slice(0, 4) + '...' : phase.title}
+                styles.tabItemText,
+                isSelected && styles.tabItemTextSelected
+              ]}>
+                {phase.title}
               </Text>
-              {phase.tasks && (
-                <Text style={[styles.phaseCount, { color: COLORS.textMuted }]}>
-                  {phaseCompleted}/{phase.tasks.length}
-                </Text>
-              )}
-            </View>
+              {isSelected && <View style={styles.tabIndicator} />}
+            </TouchableOpacity>
           );
         })}
-      </View>
+      </ScrollView>
+      {/* 移动的指示线 */}
+      <Animated.View
+        style={[
+          styles.tabMovingIndicator,
+          { transform: [{ translateX: indicatorPosition }] }
+        ]}
+      />
     </View>
   );
 }
 
-// 当前任务组件
-function CurrentTasksSection({ phases, planTypeColor, onTaskToggle }: {
-  phases: Phase[];
-  planTypeColor: string;
-  onTaskToggle?: (task: Task, phaseId: number) => void;
+// ============================================
+// 子组件 - 带动画的任务列表
+// ============================================
+function TaskListView({ phase, onTaskComplete }: {
+  phase: Phase | null;
+  onTaskComplete?: (taskId: number, phaseId: number) => void;
 }) {
-  const activePhase = phases.find(p => {
-    if (!p.tasks || p.tasks.length === 0) return false;
-    return !p.tasks.every(t => t.isCompleted);
-  });
+  if (!phase || !phase.tasks || phase.tasks.length === 0) {
+    return (
+      <View style={styles.emptyTaskContainer}>
+        <Text style={styles.emptyTaskText}>该阶段暂无任务</Text>
+      </View>
+    );
+  }
 
-  if (!activePhase || !activePhase.tasks) return null;
-
-  const incompleteTasks = activePhase.tasks.filter(t => !t.isCompleted);
-  const displayTasks = incompleteTasks.slice(0, 3);
+  // 计算未完成任务的序号（保持稳定）
+  let pendingIndex = 1;
 
   return (
-    <View style={styles.currentTasksContainer}>
-      <View style={styles.currentTasksHeader}>
-        <View style={[styles.currentTasksBadge, { backgroundColor: `${planTypeColor}12` }]}>
-          <Target size={14} color={planTypeColor} />
-          <Text style={[styles.currentTasksBadgeText, { color: planTypeColor }]}>
-            {activePhase.title}
-          </Text>
+    <View style={styles.taskListContainer}>
+      {phase.tasks.map((task) => {
+        const isCompleted = task.isCompleted;
+        const currentPendingIndex = isCompleted ? 0 : pendingIndex++;
+
+        return (
+          <AnimatedTaskRow
+            key={task.id}
+            task={task}
+            pendingIndex={currentPendingIndex}
+            onComplete={() => onTaskComplete?.(task.id, phase.id)}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+// 动画任务行组件
+function AnimatedTaskRow({ task, pendingIndex, onComplete }: {
+  task: Task;
+  pendingIndex: number;
+  onComplete?: () => void;
+}) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const checkAnim = useRef(new Animated.Value(task.isCompleted ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (task.isCompleted) {
+      // 完成动画：缩放 + 打勾
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 1.05,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 10,
+        }),
+      ]).start();
+
+      // 打勾弹入动画
+      Animated.spring(checkAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 150,
+        friction: 8,
+      }).start();
+    }
+  }, [task.isCompleted]);
+
+  return (
+    <Animated.View style={[styles.taskRow, { transform: [{ scale: scaleAnim }] }]}>
+      <Animated.View style={[
+        styles.taskIndexDot,
+        task.isCompleted ? styles.taskIndexDotCompleted : styles.taskIndexDotPending,
+        {
+          transform: [{
+            scale: checkAnim.interpolate({
+              inputRange: [0, 0.5, 1],
+              outputRange: [1, 1.2, 1],
+            })
+          }]
+        }
+      ]}>
+        {task.isCompleted ? (
+          <Check size={11} color="#FFFFFF" strokeWidth={3} />
+        ) : (
+          <Text style={styles.taskIndexText}>{pendingIndex}</Text>
+        )}
+      </Animated.View>
+      <Text style={[
+        styles.taskTitle,
+        task.isCompleted && styles.taskTitleCompleted
+      ]} numberOfLines={2}>
+        {task.title}
+      </Text>
+    </Animated.View>
+  );
+}
+
+// ============================================
+// 子组件 - 当前任务卡片
+// ============================================
+function CurrentTaskDetailCard({ task, onComplete }: {
+  task: Task | null;
+  onComplete?: () => void;
+}) {
+  const [showAiSuggestion, setShowAiSuggestion] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  const handleComplete = () => {
+    // 淡出动画
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      onComplete?.();
+    });
+  };
+
+  if (!task) return null;
+
+  const suggestion = "建议先完成语言考试备考，这将为后续申请材料准备打下坚实基础。";
+
+  return (
+    <Animated.View style={[styles.taskDetailCard, { opacity: fadeAnim }]}>
+      <View style={styles.taskDetailTopBar}>
+        <View style={styles.taskDetailBadge}>
+          <Target size={13} color={COLORS.textSecondary} />
+          <Text style={styles.taskDetailBadgeText}>当前任务</Text>
+        </View>
+        <View style={styles.taskDetailActions}>
+          <TouchableOpacity
+            style={styles.taskDetailActionBtn}
+            activeOpacity={0.7}
+            accessibilityLabel="设置提醒"
+            accessibilityRole="button"
+          >
+            <Bell size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.taskDetailActionBtn}
+            onPress={() => setShowAiSuggestion(!showAiSuggestion)}
+            activeOpacity={0.7}
+            accessibilityLabel="获取AI建议"
+            accessibilityRole="button"
+          >
+            <Sparkles size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
         </View>
       </View>
 
-      {displayTasks.map((task) => (
-        <Pressable
-          key={task.id}
-          style={({ pressed }) => [
-            styles.taskItem,
-            { backgroundColor: pressed ? COLORS.muted : COLORS.cardBg }
-          ]}
-          onPress={() => onTaskToggle?.(task, activePhase.id)}
-        >
-          <View style={[styles.taskCheckbox, { borderColor: planTypeColor }]}>
-            {!task.isCompleted && <View style={[styles.taskCheckboxInner, { backgroundColor: planTypeColor }]} />}
-          </View>
-          <Text style={[styles.taskTitle, { color: COLORS.textPrimary }]} numberOfLines={1}>
-            {task.title}
-          </Text>
-        </Pressable>
-      ))}
+      <Text style={styles.taskDetailTitle}>{task.title}</Text>
 
-      {incompleteTasks.length > 3 && (
-        <TouchableOpacity style={styles.moreTasksBtn}>
-          <Text style={styles.moreTasksText}>更多任务 (共{incompleteTasks.length}个)</Text>
-          <ChevronRight size={14} color={COLORS.textMuted} />
-        </TouchableOpacity>
+      {task.description && (
+        <Text style={styles.taskDetailDesc}>{task.description}</Text>
       )}
-    </View>
-  );
-}
 
-// 下一步行动建议组件
-function NextActionCard({ suggestion, planTypeColor }: {
-  suggestion?: string;
-  planTypeColor: string;
-}) {
-  if (!suggestion) return null;
-
-  return (
-    <View style={styles.nextActionContainer}>
-      <View style={styles.nextActionHeader}>
-        <Sparkles size={16} color={COLORS.accent} />
-        <Text style={styles.nextActionTitle}>AI 建议</Text>
-      </View>
-      <Text style={styles.nextActionText}>{suggestion}</Text>
-      <TouchableOpacity style={styles.nextActionBtn}>
-        <Text style={[styles.nextActionBtnText, { color: planTypeColor }]}>查看详情</Text>
-        <ArrowRight size={14} color={planTypeColor} />
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-// 时间节点组件
-function TimelineSection({ phases }: { phases: Phase[] }) {
-  const timeNodes = phases.flatMap(phase =>
-    (phase.tasks || []).map(task => ({
-      title: task.title,
-      date: task.completedAt || task.createdAt,
-      isCompleted: task.isCompleted
-    }))
-  ).slice(0, 4);
-
-  return (
-    <View style={styles.timelineContainer}>
-      <View style={styles.timelineHeader}>
-        <Clock size={16} color={COLORS.textSecondary} />
-        <Text style={styles.timelineTitle}>近期任务</Text>
-      </View>
-
-      {timeNodes.map((node, index) => (
-        <View key={index} style={styles.timelineItem}>
-          <View style={[
-            styles.timelineDot,
-            { backgroundColor: node.isCompleted ? COLORS.success : COLORS.primary }
-          ]} />
-          <View style={styles.timelineContent}>
-            <Text style={[
-              styles.timelineItemTitle,
-              { color: node.isCompleted ? COLORS.textMuted : COLORS.textPrimary }
-            ]}>
-              {node.title}
-            </Text>
-            <Text style={[styles.timelineDate, { color: COLORS.textMuted }]}>
-              {formatDate(node.date)}
-            </Text>
+      {showAiSuggestion && (
+        <Animated.View style={styles.aiSuggestionBox}>
+          <View style={styles.aiSuggestionHeader}>
+            <Sparkles size={14} color={COLORS.textSecondary} />
+            <Text style={styles.aiSuggestionTitle}>智能建议</Text>
           </View>
-        </View>
-      ))}
-    </View>
+          <Text style={styles.aiSuggestionText}>{suggestion}</Text>
+        </Animated.View>
+      )}
+
+      <TouchableOpacity
+        style={styles.completeBtn}
+        onPress={handleComplete}
+        activeOpacity={0.8}
+        accessibilityLabel="标记任务完成"
+        accessibilityRole="button"
+      >
+        <Check size={18} color={COLORS.onPrimary} strokeWidth={2.5} />
+        <Text style={styles.completeBtnText}>完成</Text>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
-// 统计概览组件
-function StatsOverview({ plan }: { plan: Plan }) {
-  const totalTasks = plan.phases?.flatMap(p => p.tasks || []).length || 0;
-  const completedTasks = plan.phases?.flatMap(p => p.tasks || []).filter(t => t.isCompleted).length || 0;
-  const totalPhases = plan.phases?.length || 0;
+// ============================================
+// 子组件 - 恭喜完成卡片
+// ============================================
+function CompletionCelebrationCard() {
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // 入场动画：弹入 + 淡入
+    Animated.sequence([
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 80,
+        friction: 8,
+      }),
+    ]).start();
+
+    Animated.timing(opacityAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   return (
-    <View style={styles.statsContainer}>
-      <View style={styles.statItem}>
-        <Text style={styles.statValue}>{totalPhases}</Text>
-        <Text style={styles.statLabel}>总阶段</Text>
+    <Animated.View style={[
+      styles.celebrationCard,
+      {
+        opacity: opacityAnim,
+        transform: [{ scale: scaleAnim }]
+      }
+    ]}>
+      <View style={styles.celebrationIconContainer}>
+        <Trophy size={32} color={COLORS.success} />
       </View>
-      <View style={[styles.statDivider, { backgroundColor: COLORS.border }]} />
-      <View style={styles.statItem}>
-        <Text style={styles.statValue}>{totalTasks}</Text>
-        <Text style={styles.statLabel}>总任务</Text>
+      <Text style={styles.celebrationTitle}>恭喜！</Text>
+      <Text style={styles.celebrationSubtitle}>你已经完成了所有规划任务</Text>
+      <View style={styles.celebrationStats}>
+        <View style={styles.celebrationStatItem}>
+          <Check size={16} color={COLORS.success} />
+          <Text style={styles.celebrationStatText}>全部完成</Text>
+        </View>
       </View>
-      <View style={[styles.statDivider, { backgroundColor: COLORS.border }]} />
-      <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: COLORS.success }]}>{completedTasks}</Text>
-        <Text style={styles.statLabel}>已完成</Text>
-      </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -268,64 +452,91 @@ function StatsOverview({ plan }: { plan: Plan }) {
 // 主页面
 // ============================================
 export default function PlanScreen() {
+  const { plans, fetchPlans } = usePlanStore();
   const [generatingPlan, setGeneratingPlan] = useState<Plan | null>(null);
   const [phases, setPhases] = useState<Phase[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
+  const contentFadeAnim = useRef(new Animated.Value(0)).current;
 
-  // 加载正在进行的规划及其阶段和任务
-  const loadGeneratingPlan = useCallback(async () => {
+  const getSelectedPhase = useCallback(() => {
+    if (!selectedPhaseId) {
+      return phases.find(p => p.tasks && !p.tasks.every(t => t.isCompleted)) || phases[0] || null;
+    }
+    return phases.find(p => p.id === selectedPhaseId) || null;
+  }, [phases, selectedPhaseId]);
+
+  const loadPlanData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. 获取 status=generating 的规划（最多一条）
+      // 获取所有规划列表
+      await fetchPlans(true);
+
+      // 获取进行中的规划
       const plan = await planApi.getGeneratingPlan();
-      if (!plan) {
+
+      if (plan) {
+        // 有进行中的规划，加载其详情
+        const phaseRes = await planApi.getPhaseList(plan.id);
+        const phaseList = Array.isArray(phaseRes) ? phaseRes : (phaseRes?.list || []);
+
+        const phasesWithTasks = await Promise.all(
+          phaseList.map(async (phase: Phase) => {
+            const taskRes = await planApi.getTaskList(phase.id);
+            const taskList = Array.isArray(taskRes) ? taskRes : (taskRes?.list || []);
+            return { ...phase, tasks: taskList };
+          })
+        );
+
+        setGeneratingPlan(plan);
+        setPhases(phasesWithTasks);
+
+        const defaultPhase = phasesWithTasks.find(p => p.tasks && !p.tasks.every(t => t.isCompleted)) || phasesWithTasks[0];
+        if (defaultPhase) {
+          setSelectedPhaseId(defaultPhase.id);
+        }
+      } else {
         setGeneratingPlan(null);
         setPhases([]);
-        setLoading(false);
-        return;
       }
 
-      // 2. 获取该规划的阶段列表
-      const phaseRes = await planApi.getPhaseList(plan.id);
-      const phaseList = phaseRes?.list || [];
-
-      // 3. 获取每个阶段的任务列表
-      const phasesWithTasks = await Promise.all(
-        phaseList.map(async (phase) => {
-          const taskRes = await planApi.getTaskList(phase.id);
-          return {
-            ...phase,
-            tasks: taskRes?.list || [],
-          };
-        })
-      );
-
-      setGeneratingPlan(plan);
-      setPhases(phasesWithTasks);
+      // 数据加载完成，触发淡入动画
+      setLoading(false);
+      setIsHydrated(true);
+      Animated.timing(contentFadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     } catch (error) {
       console.error("加载规划失败:", error);
-    } finally {
       setLoading(false);
+      setIsHydrated(true);
     }
-  }, []);
+  }, [fetchPlans, contentFadeAnim]);
 
   useFocusEffect(
     useCallback(() => {
-      loadGeneratingPlan();
-    }, [loadGeneratingPlan])
+      // 重置状态用于每次进入页面
+      contentFadeAnim.setValue(0);
+      setIsHydrated(false);
+      loadPlanData();
+    }, [loadPlanData, contentFadeAnim])
   );
 
-  const handleTaskToggle = async (task: Task, phaseId: number) => {
+  const handleTaskComplete = async (taskId: number, phaseId: number) => {
     try {
-      await planApi.completeTask({ id: task.id, isCompleted: !task.isCompleted });
+      const task = phases.flatMap(p => p.tasks || []).find(t => t.id === taskId);
+      if (!task) return;
 
-      // 更新本地状态
+      await planApi.completeTask({ id: taskId, isCompleted: !task.isCompleted });
       setPhases(prev => prev.map(phase => {
         if (phase.id !== phaseId) return phase;
         return {
           ...phase,
           tasks: phase.tasks?.map(t =>
-            t.id === task.id ? { ...t, isCompleted: !t.isCompleted } : t
+            t.id === taskId ? { ...t, isCompleted: !t.isCompleted } : t
           ),
         };
       }));
@@ -334,28 +545,62 @@ export default function PlanScreen() {
     }
   };
 
+  const handlePhaseSelect = (phaseId: number) => {
+    setSelectedPhaseId(phaseId);
+  };
+
   const getProgress = () => {
     if (phases.length === 0) return { completed: 0, total: 0, percent: 0 };
     const allTasks = phases.flatMap(p => p.tasks || []);
     const total = allTasks.length;
     const completed = allTasks.filter(t => t.isCompleted).length;
-    return {
-      total,
-      completed,
-      percent: total > 0 ? Math.round((completed / total) * 100) : 0,
-    };
+    return { total, completed, percent: total > 0 ? Math.round((completed / total) * 100) : 0 };
   };
 
-  // 空状态：无规划时
-  if (!loading && !generatingPlan) {
+  const getGlobalCurrentTask = useCallback(() => {
+    for (const phase of phases) {
+      if (phase.tasks && phase.tasks.length > 0) {
+        const incompleteTasks = phase.tasks.filter(t => !t.isCompleted);
+        if (incompleteTasks.length > 0) {
+          return incompleteTasks[0];
+        }
+      }
+    }
+    return null;
+  }, [phases]);
+
+  const isAllCompleted = useCallback(() => {
+    if (phases.length === 0) return false;
+    const allTasks = phases.flatMap(p => p.tasks || []);
+    return allTasks.length > 0 && allTasks.every(t => t.isCompleted);
+  }, [phases]);
+
+  // 判断是否有规划但没有进行中的
+  const hasPlansButNoGenerating = !loading && isHydrated && plans.length > 0 && !generatingPlan;
+
+  if (!loading && !generatingPlan && plans.length === 0) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]}>
-        <PlanEmptyState onCreatePlan={() => router.push("/(plan)/create-plan")} colors={COLORS} />
+        <PlanEmptyState
+          onCreatePlan={() => router.push("/(plan)/create-plan")}
+          colors={COLORS}
+        />
       </SafeAreaView>
     );
   }
 
-  const planWithPhases = generatingPlan ? { ...generatingPlan, phases } : null;
+  if (hasPlansButNoGenerating) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]}>
+        <PlanEmptyState
+          onViewPlans={() => router.push("/(plan)/plan-list")}
+          colors={COLORS}
+          hasPlans={true}
+        />
+      </SafeAreaView>
+    );
+  }
+
   const progress = getProgress();
   const type = generatingPlan ? (typeConfig[generatingPlan.type as string] || typeConfig.tourism) : null;
   const status = generatingPlan ? (statusConfig[generatingPlan.status as string] || statusConfig.draft) : null;
@@ -363,6 +608,14 @@ export default function PlanScreen() {
   const destinationText = generatingPlan?.destination.country ||
     generatingPlan?.destination.city ||
     generatingPlan?.destination.province || "";
+  const selectedPhase = getSelectedPhase();
+  const globalCurrentTask = getGlobalCurrentTask();
+  const allCompleted = isAllCompleted();
+
+  // 是否显示骨架屏（首次加载且未获取到数据时）
+  const showSkeleton = loading && !generatingPlan;
+  // 是否显示内容（骨架屏完成后或已有数据时）
+  const showContent = isHydrated || (!loading && (generatingPlan || !showSkeleton));
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]}>
@@ -378,40 +631,38 @@ export default function PlanScreen() {
             style={styles.allPlansBtn}
             activeOpacity={0.7}
             onPress={() => router.push("/(plan)/plan-list")}
+            accessibilityLabel="查看所有规划"
+            accessibilityRole="button"
           >
             <Text style={styles.allPlansText}>所有规划</Text>
             <ChevronRight size={14} color={COLORS.textMuted} />
           </TouchableOpacity>
         </View>
 
-        {/* 加载中 */}
-        {loading && (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>加载中...</Text>
+        {/* 骨架屏 - 首次加载时显示 */}
+        {showSkeleton && (
+          <View style={styles.featuredSection}>
+            <SkeletonCard />
+            <SkeletonPhaseCard />
           </View>
         )}
 
-        {/* 进行中规划卡片 */}
-        {generatingPlan && type && status && planWithPhases && (
-          <View style={styles.featuredSection}>
+        {/* 实际内容 - 带淡入动画 */}
+        {showContent && generatingPlan && type && status && (
+          <Animated.View style={[styles.featuredSection, { opacity: contentFadeAnim }]}>
             {/* 主卡片 */}
             <TouchableOpacity
               style={styles.mainCard}
               activeOpacity={0.95}
-              onPress={() => router.push({
-                pathname: "/(plan)/plan-detail",
-                params: { id: String(generatingPlan.id) },
-              })}
+              onPress={() => router.push({ pathname: "/(plan)/plan-detail", params: { id: String(generatingPlan.id) } })}
+              accessibilityLabel={`查看 ${generatingPlan.title} 详情`}
+              accessibilityRole="link"
             >
-              {/* 顶部色条 */}
-              <View style={[styles.mainCardAccent, { backgroundColor: type.color }]} />
-
               <View style={styles.mainCardContent}>
-                {/* 标签行 */}
                 <View style={styles.mainCardHeader}>
-                  <View style={[styles.typeBadge, { backgroundColor: type.bg }]}>
-                    <IconComp size={14} color={type.color} />
-                    <Text style={[styles.typeLabel, { color: type.color }]}>{type.label}</Text>
+                  <View style={styles.typeBadge}>
+                    <IconComp size={14} color={COLORS.textSecondary} />
+                    <Text style={styles.typeLabel}>{type.label}</Text>
                   </View>
                   <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
                     <View style={[styles.statusDot, { backgroundColor: status.text }]} />
@@ -419,107 +670,84 @@ export default function PlanScreen() {
                   </View>
                 </View>
 
-                {/* 标题与目的地 */}
                 <Text style={styles.planTitle}>{generatingPlan.title}</Text>
                 <View style={styles.destinationRow}>
                   <MapPin size={13} color={COLORS.textMuted} />
                   <Text style={styles.destinationText}>{destinationText}</Text>
                 </View>
 
-                {/* 进度条 */}
                 {progress.total > 0 && (
                   <View style={styles.progressSection}>
-                    <View style={styles.progressHeader}>
-                      <Text style={styles.progressLabel}>整体进度</Text>
-                      <Text style={[styles.progressValue, { color: type.color }]}>
-                        {progress.completed}/{progress.total}
-                      </Text>
-                    </View>
-                    <View style={[styles.progressBarBg, { backgroundColor: COLORS.muted }]}>
-                      <View
+                    <View style={styles.progressBarBg}>
+                      <Animated.View
                         style={[
                           styles.progressBarFill,
-                          { width: `${progress.percent}%`, backgroundColor: type.color }
+                          { width: `${progress.percent}%` }
                         ]}
                       />
                     </View>
+                    <Text style={styles.progressText}>{progress.percent}%</Text>
                   </View>
                 )}
 
-                {/* 底部操作栏 */}
-                <View style={styles.mainCardFooter}>
-                  <View style={styles.footerLeft}>
-                    <Calendar1 size={12} color={COLORS.textMuted} />
-                    <Text style={styles.footerDateText}>{formatDate(generatingPlan.createdAt)}</Text>
+                <View style={styles.statsRow}>
+                  <View style={styles.statItem}>
+                    <Text style={[styles.statValue, { color: COLORS.success }]}>{progress.completed}</Text>
+                    <Text style={styles.statLabel}>已完成</Text>
                   </View>
-                  <TouchableOpacity
-                    style={[styles.continueBtn, { backgroundColor: type.color }]}
-                    activeOpacity={0.8}
-                    onPress={() => router.push({
-                      pathname: "/(plan)/plan-detail",
-                      params: { id: String(generatingPlan.id) },
-                    })}
-                  >
-                    <Text style={styles.continueBtnText}>继续</Text>
-                    <ArrowRight size={14} color={COLORS.onPrimary} />
-                  </TouchableOpacity>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>{progress.total - progress.completed}</Text>
+                    <Text style={styles.statLabel}>待完成</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>{phases.length}</Text>
+                    <Text style={styles.statLabel}>阶段</Text>
+                  </View>
                 </View>
               </View>
             </TouchableOpacity>
 
-            {/* 统计概览 */}
-            <StatsOverview plan={planWithPhases} />
-
-            {/* 阶段概览 */}
+            {/* 阶段+任务卡片 */}
             {phases.length > 0 && (
-              <PhaseOverview phases={phases} planTypeColor={type.color} />
+              <View style={styles.phaseTaskCard}>
+                <PhaseTabSwitcher
+                  phases={phases}
+                  selectedPhaseId={selectedPhaseId}
+                  onPhaseSelect={handlePhaseSelect}
+                />
+
+                <TaskListView
+                  phase={selectedPhase}
+                  onTaskComplete={handleTaskComplete}
+                />
+              </View>
             )}
 
-            {/* 当前任务 */}
-            {phases.length > 0 && (
-              <CurrentTasksSection
-                phases={phases}
-                planTypeColor={type.color}
-                onTaskToggle={handleTaskToggle}
+            {/* 当前任务卡片 或 恭喜完成卡片 */}
+            {allCompleted ? (
+              <CompletionCelebrationCard />
+            ) : globalCurrentTask ? (
+              <CurrentTaskDetailCard
+                task={globalCurrentTask}
+                onComplete={() => {
+                  const phase = phases.find(p => p.tasks?.some(t => t.id === globalCurrentTask.id));
+                  if (phase) {
+                    handleTaskComplete(globalCurrentTask.id, phase.id);
+                  }
+                }}
               />
-            )}
-
-            {/* AI建议 */}
-            <NextActionCard
-              suggestion="建议先完成语言考试备考，这将为后续申请材料准备打下坚实基础。"
-              planTypeColor={type.color}
-            />
-
-            {/* 时间节点 */}
-            {phases.length > 0 && (
-              <TimelineSection phases={phases} />
-            )}
-          </View>
+            ) : null}
+          </Animated.View>
         )}
-
-        {/* 快捷操作 */}
-        <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={styles.actionCard}
-            activeOpacity={0.85}
-            onPress={() => router.push("/(plan)/create-plan")}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: `${COLORS.primary}12` }]}>
-              <Plus size={22} color={COLORS.primary} />
-            </View>
-            <View>
-              <Text style={styles.actionTitle}>新建规划</Text>
-              <Text style={styles.actionDesc}>开始创建新的出国计划</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 // ============================================
-// Styles - Soft UI Evolution Design System
+// Styles
 // ============================================
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -550,6 +778,108 @@ const styles = StyleSheet.create({
   loadingContainer: { padding: 40, alignItems: "center" },
   loadingText: { fontSize: 14, color: COLORS.textMuted },
 
+  // Skeleton Card
+  skeletonCard: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  skeletonContent: { padding: 20 },
+  skeletonHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  skeletonBadge: {
+    width: 70,
+    height: 24,
+    borderRadius: 8,
+    backgroundColor: COLORS.muted,
+  },
+  skeletonBadgeSmall: {
+    width: 60,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.muted,
+  },
+  skeletonTitle: {
+    width: "70%",
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: COLORS.muted,
+    marginBottom: 10,
+  },
+  skeletonSubtitle: {
+    width: "45%",
+    height: 16,
+    borderRadius: 4,
+    backgroundColor: COLORS.muted,
+    marginBottom: 18,
+  },
+  skeletonProgress: {
+    width: "100%",
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.muted,
+    marginBottom: 18,
+  },
+  skeletonStats: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 12,
+    backgroundColor: COLORS.muted,
+    borderRadius: 12,
+  },
+  skeletonStat: {
+    width: 50,
+    height: 30,
+    borderRadius: 6,
+    backgroundColor: COLORS.border,
+  },
+
+  // Skeleton Phase Card
+  skeletonPhaseCard: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: "hidden",
+  },
+  skeletonTabs: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 24,
+  },
+  skeletonTab: {
+    width: 50,
+    height: 20,
+    borderRadius: 4,
+    backgroundColor: COLORS.muted,
+  },
+  skeletonTasks: {
+    padding: 20,
+  },
+  skeletonTaskRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  skeletonTaskDot: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: COLORS.muted,
+    marginRight: 14,
+  },
+  skeletonTaskText: {
+    flex: 1,
+    height: 18,
+    borderRadius: 4,
+    backgroundColor: COLORS.muted,
+  },
+
   // Featured Section
   featuredSection: { paddingHorizontal: 20, gap: 16 },
 
@@ -558,29 +888,26 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBg,
     borderRadius: 20,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  mainCardAccent: { height: 6 },
   mainCardContent: { padding: 20 },
   mainCardHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   typeBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 8,
+    backgroundColor: COLORS.muted,
   },
-  typeLabel: { fontSize: 12, fontWeight: "600" },
+  typeLabel: { fontSize: 12, fontWeight: "600", color: COLORS.textSecondary },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -592,280 +919,298 @@ const styles = StyleSheet.create({
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontSize: 11, fontWeight: "600" },
   planTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "700",
     color: COLORS.textPrimary,
-    marginBottom: 8,
+    marginBottom: 6,
     letterSpacing: -0.3,
   },
   destinationRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   destinationText: { fontSize: 14, color: COLORS.textSecondary },
 
   // Progress
-  progressSection: { marginBottom: 20 },
-  progressHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  progressLabel: { fontSize: 13, color: COLORS.textMuted, fontWeight: "500" },
-  progressValue: { fontSize: 14, fontWeight: "700" },
-  progressBarBg: { height: 6, borderRadius: 3, overflow: "hidden" },
-  progressBarFill: { height: "100%", borderRadius: 3 },
-
-  // Main Card Footer
-  mainCardFooter: {
+  progressSection: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 4,
-  },
-  footerLeft: { flexDirection: "row", alignItems: "center", gap: 5 },
-  footerDateText: { fontSize: 12, color: COLORS.textMuted },
-  continueBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  continueBtnText: { fontSize: 14, fontWeight: "600", color: COLORS.onPrimary },
-
-  // Stats Overview
-  statsContainer: {
-    flexDirection: "row",
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  statItem: { flex: 1, alignItems: "center" },
-  statValue: { fontSize: 22, fontWeight: "700", color: COLORS.textPrimary, marginBottom: 4 },
-  statLabel: { fontSize: 12, color: COLORS.textMuted },
-  statDivider: { width: 1, marginVertical: 4 },
-
-  // Phase Overview
-  phaseOverviewContainer: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
     marginBottom: 16,
+    gap: 12,
   },
-  phasesRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  phaseItem: {
-    alignItems: "center",
+  progressBarBg: {
     flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.muted,
+    overflow: "hidden",
   },
-  phaseIconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
+  progressBarFill: {
+    height: "100%",
+    borderRadius: 3,
+    backgroundColor: COLORS.primary,
   },
-  phaseLabel: {
-    fontSize: 11,
-    fontWeight: "500",
-    textAlign: "center",
-    marginBottom: 2,
-  },
-  phaseCount: {
-    fontSize: 10,
+  progressText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
   },
 
-  // Current Tasks
-  currentTasksContainer: {
+  // Stats Row
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    backgroundColor: COLORS.muted,
+    borderRadius: 12,
+  },
+  statItem: { alignItems: "center" },
+  statValue: { fontSize: 18, fontWeight: "700", color: COLORS.textPrimary, marginBottom: 2 },
+  statLabel: { fontSize: 11, color: COLORS.textMuted },
+  statDivider: { width: 1, height: 28, backgroundColor: COLORS.border },
+
+  // Phase + Task Card
+  phaseTaskCard: {
     backgroundColor: COLORS.cardBg,
     borderRadius: 16,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  currentTasksHeader: { marginBottom: 12 },
-  currentTasksBadge: {
-    flexDirection: "row",
+
+  // Tab Switcher
+  tabContainer: {
+    borderBottomWidth: 0,
+    position: "relative",
+  },
+  tabScrollContent: {
+    paddingHorizontal: 16,
+    gap: 24,
+  },
+  tabItem: {
+    paddingVertical: 14,
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    alignSelf: "flex-start",
+    position: "relative",
   },
-  currentTasksBadgeText: { fontSize: 12, fontWeight: "600" },
-  taskItem: {
-    flexDirection: "row",
+  tabItemText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: COLORS.textMuted,
+  },
+  tabItemTextSelected: {
+    color: COLORS.textPrimary,
+    fontWeight: "600",
+  },
+  tabIndicator: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: COLORS.primary,
+    borderRadius: 1,
+  },
+  tabMovingIndicator: {
+    position: "absolute",
+    bottom: 0,
+    left: 16,
+    width: 40,
+    height: 2,
+    backgroundColor: COLORS.primary,
+    borderRadius: 1,
+  },
+
+  // Task List
+  taskListContainer: {
+    padding: 20,
+  },
+  emptyTaskContainer: {
+    padding: 32,
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    marginBottom: 8,
   },
-  taskCheckbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
+  emptyTaskText: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+  },
+  taskRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 20,
+  },
+  taskIndexDot: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
+    marginRight: 14,
+    marginTop: 1,
   },
-  taskCheckboxInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 3,
+  taskIndexDotPending: {
+    backgroundColor: COLORS.primary,
+  },
+  taskIndexDotCompleted: {
+    backgroundColor: COLORS.success,
+  },
+  taskIndexText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.onPrimary,
   },
   taskTitle: {
     fontSize: 14,
     fontWeight: "500",
+    color: COLORS.textPrimary,
     flex: 1,
+    lineHeight: 22,
   },
-  moreTasksBtn: {
+  taskTitleCompleted: {
+    color: COLORS.textMuted,
+  },
+
+  // Task Detail Card
+  taskDetailCard: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 20,
+  },
+  taskDetailTopBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  taskDetailBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: COLORS.muted,
+  },
+  taskDetailBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+  },
+  taskDetailActions: {
+    flexDirection: "row",
     gap: 4,
   },
-  moreTasksText: { fontSize: 13, color: COLORS.textMuted },
-
-  // Next Action
-  nextActionContainer: {
-    backgroundColor: COLORS.warningLight,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "rgba(245, 158, 11, 0.15)",
+  taskDetailActionBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.muted,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  nextActionHeader: {
+  taskDetailTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+    marginBottom: 6,
+    letterSpacing: -0.2,
+  },
+  taskDetailDesc: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+
+  // AI Suggestion Box
+  aiSuggestionBox: {
+    backgroundColor: COLORS.muted,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  aiSuggestionHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     marginBottom: 8,
   },
-  nextActionTitle: {
-    fontSize: 13,
+  aiSuggestionTitle: {
+    fontSize: 12,
     fontWeight: "600",
-    color: COLORS.accent
-  },
-  nextActionText: {
-    fontSize: 14,
     color: COLORS.textSecondary,
-    lineHeight: 20,
-    marginBottom: 12,
   },
-  nextActionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  nextActionBtnText: {
+  aiSuggestionText: {
     fontSize: 13,
-    fontWeight: "600",
+    color: COLORS.textSecondary,
+    lineHeight: 19,
   },
 
-  // Timeline
-  timelineContainer: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+  // Complete Button
+  completeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
   },
-  timelineHeader: {
+  completeBtnText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.onPrimary,
+  },
+
+  // Celebration Card
+  celebrationCard: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.success,
+    padding: 28,
+    alignItems: "center",
+  },
+  celebrationIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: COLORS.successLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  celebrationTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: COLORS.success,
+    marginBottom: 8,
+  },
+  celebrationSubtitle: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  celebrationStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  celebrationStatItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 16,
   },
-  timelineTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-  },
-  timelineItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 16,
-  },
-  timelineDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 6,
-    marginRight: 12,
-  },
-  timelineContent: { flex: 1 },
-  timelineItemTitle: {
+  celebrationStatText: {
     fontSize: 14,
-    fontWeight: "500",
-    marginBottom: 2,
-  },
-  timelineDate: { fontSize: 12 },
-
-  // Quick Actions
-  quickActions: {
-    flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 20,
-    marginTop: 8,
-  },
-  actionCard: {
-    flex: 1,
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 16,
-    padding: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  actionTitle: {
-    fontSize: 15,
     fontWeight: "600",
-    color: COLORS.textPrimary,
-    marginBottom: 3,
+    color: COLORS.success,
   },
-  actionDesc: { fontSize: 12, color: COLORS.textMuted },
 });

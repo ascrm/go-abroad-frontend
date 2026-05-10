@@ -6,7 +6,13 @@
 export type PlanType = 'tourism' | 'study' | 'work' | 'immigration';
 
 // 规划状态
-export type PlanStatus = 'draft' | 'generating' | 'completed' | 'archived';
+export type PlanStatus = 'draft' | 'generating' | 'paused' | 'completed';
+
+// 任务/阶段状态
+export type TaskStatus = 'pending' | 'in_progress' | 'completed';
+
+// 任务优先级
+export type TaskPriority = 'low' | 'medium' | 'high';
 
 // 目的地（支持精确到城市）
 export interface Destination {
@@ -72,6 +78,10 @@ export interface CreatePlanParams {
   type: PlanType;
   destination: Destination;
   formData: PlanFormData;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  planDate?: string;
 }
 
 // 更新规划请求
@@ -81,6 +91,10 @@ export interface UpdatePlanParams {
   destination?: Destination;
   formData?: PlanFormData;
   status?: PlanStatus;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  planDate?: string;
 }
 
 // 规划列表查询参数
@@ -96,6 +110,12 @@ export interface CreatePhaseParams {
   planId: number;
   title: string;
   description?: string;
+  status?: TaskStatus;
+  startDate?: string;
+  endDate?: string;
+  planDate?: string;
+  reminderTime?: string;
+  isMilestone?: boolean;
   sortOrder?: number;
 }
 
@@ -104,7 +124,20 @@ export interface UpdatePhaseParams {
   id: number;
   title?: string;
   description?: string;
+  status?: TaskStatus;
+  startDate?: string;
+  endDate?: string;
+  planDate?: string;
+  reminderTime?: string;
+  isMilestone?: boolean;
   sortOrder?: number;
+}
+
+// 附件
+export interface Attachment {
+  name: string;
+  url: string;
+  type?: string;
 }
 
 // 创建任务请求
@@ -112,8 +145,15 @@ export interface CreateTaskParams {
   phaseId: number;
   title: string;
   description?: string;
-  aiSuggestion?: string;      // AI 建议
-  quickEntries?: QuickEntry[]; // 快捷入口
+  aiSuggestion?: string;
+  formData?: Record<string, any>;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  reminderTime?: string;
+  attachments?: Attachment[];
+  startDate?: string;
+  endDate?: string;
+  planDate?: string;
   sortOrder?: number;
 }
 
@@ -122,23 +162,22 @@ export interface UpdateTaskParams {
   id: number;
   title?: string;
   description?: string;
-  isCompleted?: boolean;
   aiSuggestion?: string;
-  quickEntries?: QuickEntry[];
+  formData?: Record<string, any>;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  reminderTime?: string;
+  attachments?: Attachment[];
+  startDate?: string;
+  endDate?: string;
+  planDate?: string;
   sortOrder?: number;
-}
-
-// 快捷入口
-export interface QuickEntry {
-  title: string;
-  url: string;
-  icon?: string;
 }
 
 // 完成任务请求
 export interface CompleteTaskParams {
   id: number;
-  isCompleted: boolean;
+  status: TaskStatus;
 }
 
 // ============================================
@@ -155,7 +194,11 @@ export interface Plan {
   status: PlanStatus;
   formData: PlanFormData;
   coverImage?: string;
-  phases?: Phase[];  // 包含阶段和任务
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  planDate?: string;
+  phases?: Phase[];
   createdAt: string;
   updatedAt: string;
 }
@@ -166,6 +209,12 @@ export interface Phase {
   planId: number;
   title: string;
   description?: string;
+  status?: TaskStatus;
+  startDate?: string;
+  endDate?: string;
+  planDate?: string;
+  reminderTime?: string;
+  isMilestone?: boolean;
   sortOrder: number;
   tasks?: Task[];
   createdAt: string;
@@ -177,12 +226,16 @@ export interface Task {
   phaseId: number;
   title: string;
   description?: string;
-  isCompleted: boolean;
-  completedAt?: string;
+  status?: TaskStatus;
+  priority?: TaskPriority;
   aiSuggestion?: string;
-  quickEntries?: QuickEntry[];
+  formData?: Record<string, any>;
+  reminderTime?: string;
+  attachments?: Attachment[];
+  startDate?: string;
+  endDate?: string;
+  planDate?: string;
   sortOrder: number;
-  createdAt: string;
 }
 
 // 规划列表响应
