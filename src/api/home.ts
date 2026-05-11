@@ -242,3 +242,33 @@ export async function getHomeData(): Promise<HomeData> {
   ]);
   return { featuredArticles, recentQuestions };
 }
+
+/**
+ * 批量获取文章详情
+ */
+export async function getArticleBatch(ids: number[]): Promise<ArticleItem[]> {
+  return client.post(API_ENDPOINTS.home.articleBatch, { ids });
+}
+
+/**
+ * 批量获取问题详情
+ */
+export async function getQuestionBatch(ids: number[]): Promise<QuestionItem[]> {
+  return client.post(API_ENDPOINTS.home.questionBatch, { ids });
+}
+
+// 简化版类型用于批量查询
+export interface ArticleItem {
+  id: number;
+  title: string;
+  author: string;
+  views: string;
+  thumbnail: string;
+}
+
+export interface QuestionItem {
+  id: number;
+  title: string;
+  author: string;
+  views: string;
+}

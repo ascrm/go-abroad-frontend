@@ -476,6 +476,20 @@ app.delete('/api/home/article/:id', (req, res) => {
   res.json(mockResponse({ success: true }));
 });
 
+// Batch query articles by ids
+app.post('/api/home/article/batch', (req, res) => {
+  const { ids } = req.body;
+  const articles = [
+    { id: 1, title: '日本关西7日深度游攻略｜京都大阪奈良完整路线', author: '旅行达人小七', views: '1.2万', thumbnail: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=200' },
+    { id: 2, title: '欧洲15天自由行：巴黎到罗马经典路线分享', author: '欧洲小王子', views: '8934', thumbnail: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=200' },
+    { id: 3, title: '东南亚背包客指南：3周穿越泰老柬', author: '小K在路上', views: '6789', thumbnail: 'https://images.unsplash.com/photo-1528181304800-259b08848526?w=200' },
+    { id: 4, title: '新西兰南岛自驾14天：寻找中土世界的美景', author: '山野追光', views: '4567', thumbnail: 'https://images.unsplash.com/photo-1507699622108-4be3abd695ad?w=200' },
+    { id: 5, title: '冰岛环岛全攻略：追寻极光与火山的奇幻之旅', author: '冰岛小猪', views: '3456', thumbnail: 'https://images.unsplash.com/photo-1504829857797-ddff29c27927?w=200' },
+  ];
+  const result = (ids || []).map(id => articles.find(a => a.id === id)).filter(Boolean);
+  res.json(mockResponse(result));
+});
+
 // Home endpoints - Questions
 app.get('/api/home/question/list', (req, res) => {
   res.json(mockResponse({
@@ -686,6 +700,21 @@ app.delete('/api/home/question/:id', (req, res) => {
   res.json(mockResponse({ success: true }));
 });
 
+// Batch query questions by ids
+app.post('/api/home/question/batch', (req, res) => {
+  const { ids } = req.body;
+  const questions = [
+    { id: 1, title: '如何申请日本旅游签证？需要准备哪些材料？', author: '东京梦', views: '2345' },
+    { id: 2, title: '欧洲签证申请被拒了，想知道原因可能是什么？', author: '巴黎小熊', views: '1890' },
+    { id: 3, title: '第一次去泰国，需要换多少泰铢比较合适？', author: '泰兰德追光', views: '1567' },
+    { id: 4, title: '新西兰打工旅行签证怎么申请？有什么条件要求？', author: '中土世界探险家', views: '3456' },
+    { id: 5, title: '在日本旅行时，手机流量卡怎么选择比较好？', author: '科技小熊', views: '987' },
+    { id: 6, title: '冰岛环岛自驾需要提前预订住宿吗？', author: '极光猎人', views: '1234' },
+  ];
+  const result = (ids || []).map(id => questions.find(q => q.id === id)).filter(Boolean);
+  res.json(mockResponse(result));
+});
+
 // Home endpoints - Answers
 app.get('/api/home/answer/list', (req, res) => {
   res.json(mockResponse({
@@ -822,6 +851,43 @@ app.get('/api/user/info', (req, res) => {
 
 app.put('/api/user/update', (req, res) => {
   res.json(mockResponse({ success: true }));
+});
+
+// Browse History (关联文章和问题的历史记录表，存储关联ID而非完整内容)
+app.get('/api/profile/browse-history', (req, res) => {
+  res.json(mockResponse({
+    list: [
+      // 文章历史记录（存储 articleId）
+      { id: 101, sourceType: 'article', sourceId: 1, browsedAt: '2026-05-10T10:30:00Z' },
+      { id: 102, sourceType: 'article', sourceId: 2, browsedAt: '2026-05-09T15:20:00Z' },
+      { id: 103, sourceType: 'article', sourceId: 3, browsedAt: '2026-05-08T09:15:00Z' },
+      { id: 104, sourceType: 'article', sourceId: 4, browsedAt: '2026-05-07T18:45:00Z' },
+      { id: 105, sourceType: 'article', sourceId: 5, browsedAt: '2026-05-06T12:00:00Z' },
+      // 问答历史记录（存储 questionId）
+      { id: 201, sourceType: 'question', sourceId: 1, browsedAt: '2026-05-10T08:00:00Z' },
+      { id: 202, sourceType: 'question', sourceId: 4, browsedAt: '2026-05-09T14:30:00Z' },
+      { id: 203, sourceType: 'question', sourceId: 2, browsedAt: '2026-05-08T16:20:00Z' },
+      { id: 204, sourceType: 'question', sourceId: 3, browsedAt: '2026-05-07T10:15:00Z' },
+      { id: 205, sourceType: 'question', sourceId: 6, browsedAt: '2026-05-05T20:00:00Z' },
+    ],
+    total: 10,
+    page: 1,
+    pageSize: 20
+  }));
+});
+
+app.get('/api/profile/playlists', (req, res) => {
+  res.json(mockResponse({
+    list: [
+      // 文章收藏记录（存储 articleId）
+      { id: 301, sourceType: 'article', sourceId: 1, createdAt: '2026-05-10T10:30:00Z' },
+      { id: 302, sourceType: 'article', sourceId: 3, createdAt: '2026-05-09T15:20:00Z' },
+      { id: 303, sourceType: 'article', sourceId: 5, createdAt: '2026-05-08T09:15:00Z' },
+    ],
+    total: 3,
+    page: 1,
+    pageSize: 20
+  }));
 });
 
 // Fallback for all other requests

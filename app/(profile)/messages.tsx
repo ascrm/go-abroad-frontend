@@ -1,7 +1,7 @@
 import { router } from "expo-router";
-import { CheckCircle, MessageSquare, X } from "lucide-react-native";
-import React, { useState } from "react";
-import { FlatList, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, FlatList, Image, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Bell, MessageCircle, Pin, PinOff, Trash2, X } from "lucide-react-native";
+import React, { useState, useRef } from "react";
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 
 interface Message {
@@ -9,9 +9,9 @@ interface Message {
   title: string;
   content: string;
   time: string;
-  avatar: string;
+  avatar?: string;
   isRead: boolean;
-  type: "system" | "order" | "activity";
+  type: "system" | "comment" | "answer";
   isPinned: boolean;
 }
 
@@ -21,49 +21,49 @@ const mockMessages: Message[] = [
     title: "系统通知",
     content: "欢迎使用 Go Abroad，您的账号已激活成功",
     time: "刚刚",
-    avatar: "https://api.dicebear.com/7.x/identicon/png?seed=system",
+    avatar: undefined,
     isRead: false,
     type: "system",
     isPinned: false,
   },
   {
     id: "2",
-    title: "订单状态更新",
-    content: "您的英国留学签证申请已进入审核阶段，预计3个工作日内完成",
+    title: "小明 评论了你",
+    content: "你好，请问英国留学签证申请需要准备哪些材料？谢谢！",
     time: "10分钟前",
-    avatar: "https://api.dicebear.com/7.x/identicon/png?seed=order",
+    avatar: "https://api.dicebear.com/7.x/avataaars/png?seed=xiaoming",
     isRead: false,
-    type: "order",
+    type: "comment",
     isPinned: true,
   },
   {
     id: "3",
-    title: "活动提醒",
-    content: "2024秋季国际教育展即将开始，点击查看详情",
+    title: "小红 回答了你的提问",
+    content: "关于英国签证办理流程，我整理了一份详细的攻略，请查看。涵盖了从准备材料到面签的全过程。",
     time: "1小时前",
-    avatar: "https://api.dicebear.com/7.x/identicon/png?seed=activity",
+    avatar: "https://api.dicebear.com/7.x/avataaars/png?seed=xiaohong",
     isRead: true,
-    type: "activity",
+    type: "answer",
     isPinned: false,
   },
   {
     id: "4",
-    title: "优惠活动",
-    content: "新用户首单立减100元，立即查看",
+    title: "系统通知",
+    content: "新功能上线：新增行程规划助手，让您的旅行更轻松",
     time: "昨天",
-    avatar: "https://api.dicebear.com/7.x/identicon/png?seed=discount",
+    avatar: undefined,
     isRead: true,
-    type: "activity",
+    type: "system",
     isPinned: false,
   },
   {
     id: "5",
-    title: "订单完成",
-    content: "您的美国探亲签证申请已通过审核，祝旅途愉快！",
+    title: "张三 评论了你",
+    content: "请问美国探亲签证的申请流程是怎样的？有没有什么需要注意的地方？希望能够得到详细的解答。",
     time: "2天前",
-    avatar: "https://api.dicebear.com/7.x/identicon/png?seed=order-complete",
+    avatar: "https://api.dicebear.com/7.x/avataaars/png?seed=zhangsan",
     isRead: true,
-    type: "order",
+    type: "comment",
     isPinned: false,
   },
 ];
@@ -72,10 +72,10 @@ const getTypeColor = (type: Message["type"]) => {
   switch (type) {
     case "system":
       return "#3B82F6";
-    case "order":
+    case "comment":
       return "#10B981";
-    case "activity":
-      return "#F59E0B";
+    case "answer":
+      return "#8B5CF6";
     default:
       return "#6B7280";
   }
@@ -88,20 +88,30 @@ interface SwipeActionProps {
 }
 
 function SwipeActions({ isPinned, onTogglePin, onDelete }: SwipeActionProps) {
+  const handleTogglePin = () => {
+    onTogglePin();
+  };
+
+  const handleDelete = () => {
+    onDelete();
+  };
+
   return (
     <View style={styles.swipeActions}>
       <TouchableOpacity
         style={[styles.swipeAction, isPinned ? styles.unpinAction : styles.pinAction]}
-        onPress={onTogglePin}
+        onPress={handleTogglePin}
         activeOpacity={0.8}
       >
+        {isPinned ? <PinOff size={20} color="white" /> : <Pin size={20} color="white" />}
         <Text style={styles.swipeActionText}>{isPinned ? "取消置顶" : "置顶"}</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.swipeAction, styles.deleteAction]}
-        onPress={onDelete}
+        onPress={handleDelete}
         activeOpacity={0.8}
       >
+        <Trash2 size={20} color="white" />
         <Text style={styles.swipeActionText}>删除</Text>
       </TouchableOpacity>
     </View>
@@ -110,6 +120,7 @@ function SwipeActions({ isPinned, onTogglePin, onDelete }: SwipeActionProps) {
 
 export default function MessagesScreen() {
   const [messages, setMessages] = useState<Message[]>(mockMessages);
+  const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
 
   const sortedMessages = [...messages].sort((a, b) => {
     if (a.isPinned !== b.isPinned) {
@@ -122,14 +133,31 @@ export default function MessagesScreen() {
     setMessages((prev) =>
       prev.map((m) => (m.id === id ? { ...m, isPinned: !m.isPinned } : m))
     );
+    swipeableRefs.current.get(id)?.close();
   };
 
   const handleDelete = (id: string) => {
-    setMessages((prev) => prev.filter((m) => m.id !== id));
+    Alert.alert(
+      "确认删除",
+      "确定要删除这条消息吗？",
+      [
+        { text: "取消", style: "cancel" },
+        {
+          text: "删除",
+          style: "destructive",
+          onPress: () => {
+            setMessages((prev) => prev.filter((m) => m.id !== id));
+          },
+        },
+      ]
+    );
   };
 
   const renderItem = ({ item }: { item: Message }) => (
     <Swipeable
+      ref={(ref) => {
+        if (ref) swipeableRefs.current.set(item.id, ref);
+      }}
       renderRightActions={() => (
         <SwipeActions
           isPinned={item.isPinned}
@@ -145,20 +173,24 @@ export default function MessagesScreen() {
           style={styles.messageTouchable}
           activeOpacity={0.7}
         >
-        <View style={[styles.avatarContainer, { backgroundColor: getTypeColor(item.type) + "20" }]}>
+        <View style={styles.avatarWrapper}>
           {item.type === "system" ? (
-            <CheckCircle size={24} color={getTypeColor(item.type)} />
-          ) : item.type === "order" ? (
-            <MessageSquare size={24} color={getTypeColor(item.type)} />
+            <View style={[styles.avatarContainer, { backgroundColor: getTypeColor(item.type) + "20" }]}>
+              <Bell size={24} color={getTypeColor(item.type)} />
+            </View>
           ) : (
-            <MessageSquare size={24} color={getTypeColor(item.type)} />
+            <Image
+              source={{ uri: item.avatar }}
+              style={styles.userAvatar}
+            />
           )}
+          {!item.isRead && <View style={styles.unreadDot} />}
         </View>
 
         <View style={styles.messageContent}>
           <View style={styles.titleRow}>
             <View style={styles.titleLeft}>
-              {item.isPinned && <Text style={styles.pinIcon}>📌</Text>}
+              {item.isPinned && <Pin size={14} color="#F59E0B" style={styles.pinIcon} />}
               <Text style={[styles.messageTitle, !item.isRead && styles.unreadText]}>
                 {item.title}
               </Text>
@@ -169,8 +201,6 @@ export default function MessagesScreen() {
             {item.content}
           </Text>
         </View>
-
-        {!item.isRead && <View style={styles.unreadDot} />}
         </TouchableOpacity>
       </View>
     </Swipeable>
@@ -178,7 +208,7 @@ export default function MessagesScreen() {
 
   const ListEmptyComponent = () => (
     <View style={styles.emptyContainer}>
-      <MessageSquare size={64} color="#D1D5DB" />
+      <MessageCircle size={64} color="#D1D5DB" />
       <Text style={styles.emptyText}>暂无消息</Text>
       <Text style={styles.emptySubText}>您还没有收到任何消息</Text>
     </View>
@@ -254,13 +284,21 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   unreadItem: {},
+  avatarWrapper: {
+    position: "relative",
+    marginRight: 12,
+  },
   avatarContainer: {
     width: 48,
     height: 48,
     borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+  },
+  userAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   messageContent: {
     flex: 1,
@@ -277,7 +315,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pinIcon: {
-    fontSize: 12,
     marginRight: 4,
   },
   messageTitle: {
@@ -291,7 +328,7 @@ const styles = StyleSheet.create({
     color: "#111827",
   },
   messageTime: {
-    fontSize: 12,
+    fontSize: 14,
     color: "#9CA3AF",
     marginLeft: 8,
   },
@@ -301,11 +338,15 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   unreadDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     backgroundColor: "#EF4444",
-    marginLeft: 8,
+    borderWidth: 2,
+    borderColor: "white",
   },
   separator: {
     height: 1,

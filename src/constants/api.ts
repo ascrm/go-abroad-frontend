@@ -1,5 +1,5 @@
 // API 地址配置
-export const API_BASE_URL = 'http://172.20.10.3:8080/api';
+export const API_BASE_URL = 'http://192.168.131.195:8080/api';
 
 export const API_ENDPOINTS = {
   auth: {
@@ -45,6 +45,7 @@ export const API_ENDPOINTS = {
     // 文章
     articleList: '/home/article/list',
     articleDetail: '/home/article',
+    articleBatch: '/home/article/batch',
     articleCreate: '/home/article',
     articleUpdate: '/home/article',
     articleDelete: '/home/article',
@@ -52,6 +53,7 @@ export const API_ENDPOINTS = {
     // 问答-问题
     questionList: '/home/question/list',
     questionDetail: '/home/question',
+    questionBatch: '/home/question/batch',
     questionCreate: '/home/question',
     questionUpdate: '/home/question',
     questionDelete: '/home/question',
