@@ -2,11 +2,12 @@ import { useAuthStore } from "@/src/stores/authStore";
 import { SocialLoginResult, SocialType, googleLogin } from "@/src/utils/socialLogin";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { LucideIcon, Mail } from "lucide-react-native";
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ArrowLeft, Mail } from "lucide-react-native";
+import { useRef } from "react";
+import { Alert, Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// 通用的社交登录处理函数
+// 通用社交登录处理函数
 const handleSocialLogin = async (
   loginFn: () => Promise<SocialLoginResult>,
   socialType: SocialType
@@ -21,7 +22,6 @@ const handleSocialLogin = async (
       return;
     }
 
-    // 调用后端第三方登录接口（只需传递 socialType 和 code）
     await socialLogin({
       socialType,
       code: result.code || '',
@@ -36,19 +36,14 @@ const handleSocialLogin = async (
 // QQ 登录处理（iOS 端暂不支持，显示提示）
 const handleQQLogin = () => {
   Alert.alert(
-    'iOS QQ 登录暂不支持',
-    '实现条件（满足任意一项）：\n1. iOS 开发者账号（$99/年）\n2. Mac 电脑',
-    [{ text: '知道了' }]
+    "iOS QQ 登录暂不支持",
+    "实现条件（满足任意一项）：\n1. iOS 开发者账号（$99/年）\n2. Mac 电脑"
   );
 };
 
 // 微信登录处理（需要企业资质）
 const handleWechatLogin = () => {
-  Alert.alert(
-    '微信登录暂不支持',
-    '需要拥有企业资质，个人开发者无法实现',
-    [{ text: '知道了' }]
-  );
+  Alert.alert("微信登录暂不支持", "需要拥有企业资质，个人开发者无法实现");
 };
 
 // Google 登录处理
@@ -56,19 +51,16 @@ const handleGoogleLogin = () => handleSocialLogin(googleLogin, SocialType.Google
 
 // Apple 登录处理（需要 iOS 开发者账号）
 const handleAppleLogin = () => {
-  Alert.alert(
-    'Apple 登录暂不支持',
-    '需要注册 iOS 个人开发者账号（$99/年）',
-    [{ text: '知道了' }]
-  );
+  Alert.alert("Apple 登录暂不支持", "需要注册 iOS 个人开发者账号（$99/年）");
 };
 
 // 登录方式数据
 const loginMethods: {
   id: string;
   title: string;
+  isPrimary?: boolean;
   iconType: "lucide" | "simple";
-  icon?: LucideIcon;
+  icon?: any;
   iconName?: string;
   iconColor: string;
   onPress: () => void;
@@ -76,9 +68,10 @@ const loginMethods: {
   {
     id: "email",
     title: "邮箱 / 手机号 / 用户名",
+    isPrimary: true,
     iconType: "lucide",
     icon: Mail,
-    iconColor: "#0076D6",
+    iconColor: "#FFFFFF",
     onPress: () => router.push("/(auth)/login-form"),
   },
   {
@@ -104,101 +97,215 @@ const otherLoginMethods: {
   id: string;
   iconName: string;
   iconColor: string;
+  label: string;
   onPress: () => void;
 }[] = [
   {
     id: "qq",
     iconName: "QQ",
     iconColor: "#12B7F5",
+    label: "QQ",
     onPress: handleQQLogin,
   },
   {
     id: "wechat",
     iconName: "Wechat",
     iconColor: "#07C160",
+    label: "微信",
     onPress: handleWechatLogin,
   },
 ];
 
+// 可复用按钮组件
+function LoginButton({
+  method,
+  index,
+}: {
+  method: typeof loginMethods[number];
+  index: number;
+}) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.96,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
+  };
+
+  return (
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <TouchableOpacity
+        className={`flex-row items-center py-4 px-4 rounded-2xl mb-3 ${
+          method.isPrimary
+            ? "bg-primary-500 shadow-lg"
+            : "bg-white border border-gray-100"
+        }`}
+        onPress={method.onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
+      >
+        {/* 图标 */}
+        <View
+          className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
+            method.isPrimary ? "bg-white/20" : "bg-gray-50"
+          }`}
+        >
+          {method.iconType === "simple" ? (
+            <Image
+              source={{
+                uri: `https://cdn.simpleicons.org/${method.iconName}/${method.iconColor.replace("#", "")}`,
+              }}
+              style={{ width: 24, height: 24 }}
+              contentFit="contain"
+            />
+          ) : method.id === "email" ? (
+            <Mail size={24} color={method.isPrimary ? "#FFFFFF" : method.iconColor} />
+          ) : null}
+        </View>
+        {/* 标题 */}
+        <Text
+          className={`flex-1 text-base font-medium ${
+            method.isPrimary ? "text-white" : "text-gray-800"
+          }`}
+        >
+          {method.title}
+        </Text>
+        {/* 右侧箭头 */}
+        <Text className={method.isPrimary ? "text-white/70" : "text-gray-400"}>→</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// 其他登录方式图标按钮
+function SocialIconButton({
+  method,
+}: {
+  method: typeof otherLoginMethods[number];
+}) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
+  };
+
+  return (
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <TouchableOpacity
+        className="w-12 h-12 bg-white rounded-full items-center justify-center shadow-sm"
+        onPress={method.onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
+        accessibilityLabel={`${method.label}登录`}
+        accessibilityRole="button"
+      >
+        <Image
+          source={{
+            uri: `https://cdn.simpleicons.org/${method.iconName}/${method.iconColor.replace("#", "")}`,
+          }}
+          style={{ width: 28, height: 28 }}
+          contentFit="contain"
+        />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 export default function LoginScreen() {
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
-      {/* 顶部 */}
+      {/* 顶部返回 */}
       <View className="px-6 pt-4">
         <TouchableOpacity
           className="w-10 h-10 bg-white rounded-full items-center justify-center shadow-sm"
           onPress={() => router.back()}
+          accessibilityLabel="返回"
+          accessibilityRole="button"
         >
-          <Text className="text-gray-600 text-xl">←</Text>
+          <ArrowLeft size={20} color="#4B5563" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {/* Logo */}
+        <View className="items-center mb-8">
+          <Image
+            source={require("@/assets/images/logo.png")}
+            style={{ width: 64, height: 64 }}
+            contentFit="contain"
+          />
+        </View>
+
         {/* 标题 */}
-        <View className="mb-12">
+        <View className="mb-8">
           <Text className="text-3xl font-bold text-gray-900 text-center">登录</Text>
+          <Text className="text-gray-500 text-center mt-2">
+            欢迎回来！请登录您的账户
+          </Text>
         </View>
 
         {/* 登录方式列表 */}
-        <View className="flex-col gap-4">
-          {loginMethods.map((method) => (
-            <TouchableOpacity
-              key={method.id}
-              className="bg-white rounded-xl py-4 px-4 flex-row items-center border border-gray-100"
-              onPress={method.onPress}
-              activeOpacity={0.7}
-            >
-              {/* 图标 */}
-              <View className="w-8 h-8 items-center justify-center mr-3">
-                {method.iconType === "simple" ? (
-                  <Image
-                    source={{ uri: `https://cdn.simpleicons.org/${method.iconName}/${method.iconColor.replace('#', '')}` }}
-                    style={{ width: 24, height: 24 }}
-                    contentFit="contain"
-                  />
-                ) : method.id === "email" ? (
-                  <Mail size={24} color={method.iconColor} />
-                ) : null}
-              </View>
-              {/* 标题 */}
-              <Text className="flex-1 text-gray-800 text-base font-medium text-center">
-                {method.title}
-              </Text>
-              {/* 占位保持布局 */}
-              <View className="w-6" />
-            </TouchableOpacity>
+        <View className="flex-col gap-3">
+          {loginMethods.map((method, index) => (
+            <LoginButton key={method.id} method={method} index={index} />
           ))}
         </View>
 
+        {/* 分隔线 */}
+        <View className="flex-row items-center my-6">
+          <View className="flex-1 h-px bg-gray-200" />
+          <Text className="px-4 text-gray-400 text-sm">其他登录方式</Text>
+          <View className="flex-1 h-px bg-gray-200" />
+        </View>
+
         {/* 其他登录方式（仅图标） */}
-        <View className="mt-10">
-          <Text className="text-center text-gray-400 text-sm mb-4">其他登录方式</Text>
-          <View className="flex-row justify-center gap-8">
-            {otherLoginMethods.map((method) => (
-              <TouchableOpacity
-                key={method.id}
-                className="w-12 h-12 bg-white rounded-full items-center justify-center"
-                onPress={method.onPress}
-                activeOpacity={0.7}
-              >
-                <Image
-                  source={{ uri: `https://cdn.simpleicons.org/${method.iconName}/${method.iconColor.replace('#', '')}` }}
-                  style={{ width: 28, height: 28 }}
-                  contentFit="contain"
-                />
-              </TouchableOpacity>
-            ))}
-          </View>
+        <View className="flex-row justify-center gap-6">
+          {otherLoginMethods.map((method) => (
+            <SocialIconButton key={method.id} method={method} />
+          ))}
         </View>
 
         {/* 注册提示 */}
-        <View className="mt-64 items-center">
+        <View className="flex-1 justify-end items-center pb-8 mt-8">
           <Text className="text-gray-500 text-sm">尚未拥有账号？</Text>
-          <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
-            <Text className="text-blue-500 text-sm font-medium mt-1">注册</Text>
+          <TouchableOpacity
+            className="mt-1"
+            onPress={() => router.push("/(auth)/register")}
+            accessibilityLabel="前往注册"
+            accessibilityRole="button"
+          >
+            <Text className="text-blue-500 text-sm font-medium">注册</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -210,7 +317,7 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingTop: 12,
     paddingBottom: 40,
   },
 });
