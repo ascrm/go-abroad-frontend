@@ -3,7 +3,7 @@ import { useAuthStore } from "@/src/stores/authStore";
 import { User as UserType } from "@/src/types/auth";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { CheckCheck, LogOut, UserRoundPlus, X } from "lucide-react-native";
+import { CheckCheck, KeyRound, LogOut, UserRoundPlus, X } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import { Alert, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
@@ -115,6 +115,17 @@ export default function SwitchAccountScreen() {
 
       {/* 底部操作选项 */}
       <View style={styles.bottomActions}>
+        <TouchableOpacity
+          style={styles.actionItem}
+          onPress={() => router.push("/(profile)/reset-password-account")}
+          activeOpacity={0.7}
+        >
+          <View style={styles.actionIconContainer}>
+            <KeyRound size={20} color="#4B5563" />
+          </View>
+          <Text style={styles.actionText}>修改密码</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.actionItem}
           onPress={handleAddAccount}
