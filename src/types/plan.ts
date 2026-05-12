@@ -208,6 +208,7 @@ export interface Plan {
 export interface RecommendedResource {
   title: string;
   description: string;
+  coverImage?: string;
   url: string;
   webUrl?: string;
   category: string;

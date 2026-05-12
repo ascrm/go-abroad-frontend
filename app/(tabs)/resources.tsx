@@ -1,43 +1,32 @@
-import type { Resource, ResourceCategory } from "@/src/types/resource";
 import type { Plan, RecommendedResource } from "@/src/types/plan";
-import { getCategoryList, getResourceList } from "@/src/api/resource";
+import { getPlanList } from "@/src/api/plan";
 import { Image } from "expo-image";
 import * as Linking from "expo-linking";
 import {
   Car,
-  ChevronRight,
   ExternalLink,
-  Flag,
-  Hotel,
-  IdCardLanyard,
   MapPin,
   ShieldAlert,
   ShoppingBag,
   Smartphone,
   Star,
   Utensils,
-  Bookmark
+  Bookmark,
+  Info,
 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
-import { storage } from "@/src/utils/storage";
 
 // icon 名称 → Lucide 组件映射
 const iconMap: Record<string, React.ComponentType<any>> = {
   ShieldAlert,
-  Hotel,
   Car,
   Utensils,
   ShoppingBag,
   Smartphone,
-  IdCardLanyard,
 };
-
-function getIcon(name: string): React.ComponentType<any> {
-  return iconMap[name] ?? Star;
-}
 
 // 分类颜色映射
 const categoryColorMap: Record<string, string> = {
@@ -120,160 +109,6 @@ const TOOL_APPS: ToolApp[] = [
   },
 ];
 
-interface ResourceCardProps {
-  resource: Resource;
-  icon: React.ComponentType<any>;
-  color: string;
-  onPress: () => void;
-}
-
-function ResourceCard({ resource, icon: IconComp, color, onPress }: ResourceCardProps) {
-  return (
-    <TouchableOpacity
-      activeOpacity={0.7}
-      onPress={onPress}
-      className="bg-white rounded-2xl p-4 mb-3 flex-row items-center"
-      style={{ borderWidth: 1, borderColor: "#F0F0F0" }}
-    >
-      <View
-        className="w-12 h-12 rounded-xl items-center justify-center"
-        style={{ backgroundColor: `${color}15` }}
-      >
-        <IconComp size={22} color={color} />
-      </View>
-      <View className="flex-1 ml-3">
-        <Text className="text-base font-semibold text-gray-900">{resource.title}</Text>
-        <Text className="text-sm text-gray-500 mt-0.5" numberOfLines={1}>
-          {resource.description}
-        </Text>
-      </View>
-      <ExternalLink size={16} color="#9CA3AF" />
-    </TouchableOpacity>
-  );
-}
-
-interface FeaturedCardProps {
-  resource: Resource;
-  icon: React.ComponentType<any>;
-  color: string;
-  onPress: () => void;
-}
-
-function FeaturedCard({ resource, icon: IconComp, color, onPress }: FeaturedCardProps) {
-  return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={onPress}
-      className="rounded-2xl overflow-hidden mb-6"
-      style={{ backgroundColor: "white", borderWidth: 1, borderColor: "#F0F0F0" }}
-    >
-      {resource.imageUrl && (
-        <Image
-          source={{ uri: resource.imageUrl }}
-          style={{ width: "100%", height: 160 }}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-        />
-      )}
-      <View className="p-4">
-        <View className="flex-row items-center mb-2">
-          <View
-            className="w-10 h-10 rounded-lg items-center justify-center mr-2"
-            style={{ backgroundColor: `${color}15` }}
-          >
-            <IconComp size={20} color={color} />
-          </View>
-          <View className="flex-1">
-            <Text className="text-lg font-bold text-gray-900">{resource.title}</Text>
-            <Text className="text-xs text-gray-400 mt-0.5">{resource.description}</Text>
-          </View>
-        </View>
-        <View
-          className="rounded-xl py-2.5 items-center flex-row justify-center mt-3"
-          style={{ backgroundColor: color }}
-        >
-          <Text className="text-white font-medium text-sm mr-2">
-            {resource.meta?.cta ?? "打开应用"}
-          </Text>
-          <ExternalLink size={14} color="#FFFFFF" strokeWidth={2.5} />
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-interface CategorySectionProps {
-  category: ResourceCategory;
-  resources: Resource[];
-  onOpenLink: (url: string, webUrl?: string) => void;
-}
-
-function CategorySection({ category, resources, onOpenLink }: CategorySectionProps) {
-  const [expanded, setExpanded] = useState(true);
-  const IconComp = getIcon(category.icon);
-  const featured = resources.find((r) => r.isFeatured) ?? resources[0];
-  const rest = resources.filter((r) => r.id !== featured?.id);
-
-  if (resources.length === 0) return null;
-
-  return (
-    <View className="mb-6">
-      {/* 分类标题 */}
-      <TouchableOpacity
-        activeOpacity={0.7}
-        className="flex-row items-center justify-between mb-4"
-        onPress={() => setExpanded((v) => !v)}
-      >
-        <View className="flex-row items-center">
-          <View
-            className="w-10 h-10 rounded-xl items-center justify-center mr-3"
-            style={{ backgroundColor: `${category.color}15` }}
-          >
-            <IconComp size={22} color={category.color} />
-          </View>
-          <Text className="text-lg font-bold text-gray-900">{category.name}</Text>
-          <Text className="text-sm text-gray-400 ml-2">({resources.length})</Text>
-        </View>
-        <View className="flex-row items-center">
-          <Text className="text-sm text-gray-400 mr-1">
-            {expanded ? "收起" : "展开"}
-          </Text>
-          <ChevronRight
-            size={16}
-            color="#9CA3AF"
-            style={{ transform: [{ rotate: expanded ? "90deg" : "0deg" }] }}
-          />
-        </View>
-      </TouchableOpacity>
-
-      {expanded && (
-        <View>
-          {/* 精选卡片 */}
-          {featured && (
-            <FeaturedCard
-              resource={featured}
-              icon={IconComp}
-              color={category.color}
-              onPress={() => onOpenLink(featured.url, featured.webUrl)}
-            />
-          )}
-
-          {/* 其他资源列表 */}
-          {rest.map((item) => (
-            <ResourceCard
-              key={item.id}
-              resource={item}
-              icon={IconComp}
-              color={category.color}
-              onPress={() => onOpenLink(item.url, item.webUrl)}
-            />
-          ))}
-        </View>
-      )}
-    </View>
-  );
-}
-
 interface RecommendCardProps {
   resource: RecommendedResource;
   onPress: () => void;
@@ -287,45 +122,45 @@ function RecommendCard({ resource, onPress }: RecommendCardProps) {
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={onPress}
-      className="rounded-2xl p-5 mb-3"
+      className="rounded-2xl overflow-hidden mb-3"
       style={{
-        width: "100%",
         backgroundColor: "white",
         borderWidth: 1,
         borderColor: "#F0F0F0",
       }}
     >
-      <View className="flex-row items-center">
-        <View
-          className="w-12 h-12 rounded-xl items-center justify-center mr-3"
-          style={{ backgroundColor: `${color}15` }}
-        >
-          <IconComp size={24} color={color} />
-        </View>
-        <View className="flex-1">
-          <View className="flex-row items-center mb-1">
-            <Text className="text-base font-semibold text-gray-900">{resource.title}</Text>
-            <View
-              className="ml-2 px-2 py-0.5 rounded-md"
-              style={{ backgroundColor: `${color}15` }}
-            >
-              <Text className="text-xs" style={{ color }}>{resource.category}</Text>
-            </View>
-          </View>
-          <Text className="text-sm text-gray-500" numberOfLines={2}>
-            {resource.description}
-          </Text>
-        </View>
-        <ExternalLink size={16} color="#9CA3AF" />
-      </View>
-      {resource.cta && (
-        <View
-          className="rounded-lg py-2 items-center flex-row justify-center mt-3"
-          style={{ backgroundColor: color }}
-        >
-          <Text className="text-white text-xs font-medium mr-1">{resource.cta}</Text>
-        </View>
+      {/* 封面图 */}
+      {resource.coverImage && (
+        <Image
+          source={{ uri: resource.coverImage }}
+          style={{ width: "100%", height: 120 }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+        />
       )}
+      <View className="p-4">
+        <View className="flex-row items-center mb-2">
+          <View
+            className="w-10 h-10 rounded-lg items-center justify-center mr-2"
+            style={{ backgroundColor: `${color}15` }}
+          >
+            <IconComp size={20} color={color} />
+          </View>
+          <View className="flex-1">
+            <Text className="text-base font-semibold text-gray-900">{resource.title}</Text>
+            <Text className="text-xs text-gray-400 mt-0.5">{resource.description}</Text>
+          </View>
+        </View>
+        {resource.cta && (
+          <View
+            className="rounded-lg py-2.5 items-center flex-row justify-center mt-3"
+            style={{ backgroundColor: color }}
+          >
+            <Text className="text-white text-xs font-medium mr-2">{resource.cta}</Text>
+            <ExternalLink size={12} color="#FFFFFF" strokeWidth={2.5} />
+          </View>
+        )}
+      </View>
     </TouchableOpacity>
   );
 }
@@ -366,12 +201,11 @@ function ToolAppCard({ tool, onPress }: ToolAppCardProps) {
 }
 
 export default function ResourcesScreen() {
-  const [countryResources, setCountryResources] = useState<Resource[]>([]);
-  const [categories, setCategories] = useState<ResourceCategory[]>([]);
   const [recommendations, setRecommendations] = useState<RecommendedResource[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedCountry, setSelectedCountry] = useState("日本");
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [planType, setPlanType] = useState<string>("");
+  const [hasActivePlan, setHasActivePlan] = useState(false);
 
   const handleOpenLink = async (url: string, webUrl?: string) => {
     try {
@@ -381,38 +215,58 @@ export default function ResourcesScreen() {
     }
   };
 
-  // 每次进入页面时实时刷新数据
+  // 每次进入页面时查询正在进行中的规划
   useFocusEffect(
     useCallback(() => {
-      const loadAll = async () => {
-        // 获取当前规划（优先获取最新完成的规划）
-        const plan = await storage.getCurrentPlan();
-        const country = plan?.destination?.country ?? "日本";
-        setSelectedCountry(country);
-        setPlanType(plan?.type ?? "");
-
-        // 从规划中读取推荐资源
-        if (plan?.resource && plan.resource.length > 0) {
-          setRecommendations(plan.resource);
-        } else {
-          setRecommendations([]);
-        }
-
+      const loadPlanData = async () => {
         setLoading(true);
         try {
-          const [categoriesData, countryData] = await Promise.all([
-            getCategoryList(),
-            getResourceList(country),
-          ]);
-          setCategories(categoriesData.filter((c) => c.isActive && c.name !== "实用工具"));
-          setCountryResources(countryData.filter((r) => r.isActive));
+          // 查询正在进行中的规划
+          const response = await getPlanList({ status: "generating", pageSize: 1 });
+          const plans = response.list || [];
+
+          if (plans.length > 0) {
+            const plan = plans[0];
+            setHasActivePlan(true);
+            setSelectedCountry(plan.destination?.country ?? null);
+            setPlanType(plan.type ?? "");
+
+            // 从规划中读取推荐资源
+            if (plan.resource && plan.resource.length > 0) {
+              setRecommendations(plan.resource);
+            } else {
+              setRecommendations([]);
+            }
+          } else {
+            // 没有进行中的规划，查询最新规划
+            const latestResponse = await getPlanList({ pageSize: 1 });
+            const latestPlans = latestResponse.list || [];
+
+            if (latestPlans.length > 0) {
+              const plan = latestPlans[0];
+              setHasActivePlan(true);
+              setSelectedCountry(plan.destination?.country ?? null);
+              setPlanType(plan.type ?? "");
+
+              if (plan.resource && plan.resource.length > 0) {
+                setRecommendations(plan.resource);
+              } else {
+                setRecommendations([]);
+              }
+            } else {
+              setHasActivePlan(false);
+              setSelectedCountry(null);
+              setRecommendations([]);
+            }
+          }
         } catch (error) {
-          console.error("加载资源失败:", error);
+          console.error("加载规划数据失败:", error);
+          setHasActivePlan(false);
         } finally {
           setLoading(false);
         }
       };
-      loadAll();
+      loadPlanData();
     }, [])
   );
 
@@ -440,10 +294,12 @@ export default function ResourcesScreen() {
           <View>
             <Text className="text-2xl font-bold text-gray-900">实用资源</Text>
           </View>
-          <View className="flex-row items-center px-3 py-1.5 rounded-full">
-            <MapPin size={16} color="#3B82F6" />
-            <Text className="text-base font-medium text-blue-600 ml-1">{selectedCountry}</Text>
-          </View>
+          {selectedCountry && (
+            <View className="flex-row items-center px-3 py-1.5 rounded-full">
+              <MapPin size={16} color="#3B82F6" />
+              <Text className="text-base font-medium text-blue-600 ml-1">{selectedCountry}</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -458,29 +314,7 @@ export default function ResourcesScreen() {
           </View>
         )}
 
-        {/* AI 推荐资源 - 来自规划生成 */}
-        {!loading && recommendations.length > 0 && (
-          <View className="px-5 pt-5">
-            <View className="flex-row items-center mb-3">
-              <Bookmark size={18} color="#6B7280" className="mr-2" />
-              <Text className="text-base font-semibold text-gray-900">
-                {getRecommendTitle()}
-              </Text>
-              <View className="ml-2 px-2 py-0.5 rounded-full bg-blue-50">
-                <Text className="text-xs text-blue-600">AI 智能推荐</Text>
-              </View>
-            </View>
-            {recommendations.map((item, index) => (
-              <RecommendCard
-                key={index}
-                resource={item}
-                onPress={() => handleOpenLink(item.url, item.webUrl)}
-              />
-            ))}
-          </View>
-        )}
-
-        {/* 通用工具 - 固定数据 */}
+        {/* 通用工具 - 始终显示 */}
         {!loading && (
           <View className="px-5 pt-5">
             <Text className="text-base font-semibold text-gray-900 mb-3">
@@ -503,23 +337,44 @@ export default function ResourcesScreen() {
           </View>
         )}
 
-        {/* 分类资源 */}
-        {!loading && (
+        {/* AI 推荐资源 - 有规划且有资源才显示 */}
+        {!loading && hasActivePlan && recommendations.length > 0 && (
           <View className="px-5 pt-6">
-            <Text className="text-base font-semibold text-gray-900 mb-4">
-              分类推荐
-            </Text>
-            {categories.map((cat) => {
-              const items = countryResources.filter((r) => r.categoryId === cat.id);
-              return (
-                <CategorySection
-                  key={cat.id}
-                  category={cat}
-                  resources={items}
-                  onOpenLink={handleOpenLink}
-                />
-              );
-            })}
+            <View className="flex-row items-center mb-3">
+              <Bookmark size={18} color="#6B7280" className="mr-2" />
+              <Text className="text-base font-semibold text-gray-900">
+                {getRecommendTitle()}
+              </Text>
+              <View className="ml-2 px-2 py-0.5 rounded-full bg-blue-50">
+                <Text className="text-xs text-blue-600">AI 智能推荐</Text>
+              </View>
+            </View>
+            {recommendations.map((item, index) => (
+              <RecommendCard
+                key={index}
+                resource={item}
+                onPress={() => handleOpenLink(item.url, item.webUrl)}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* 没有进行中的规划时显示提示文字 */}
+        {!loading && (!hasActivePlan || recommendations.length === 0) && (
+          <View className="px-5 pt-6">
+            <View className="flex-row items-center mb-3">
+              <Info size={18} color="#6B7280" className="mr-2" />
+              <Text className="text-base font-semibold text-gray-900">
+                AI 智能推荐
+              </Text>
+            </View>
+            <View className="bg-white rounded-2xl p-4" style={{ borderWidth: 1, borderColor: "#F0F0F0" }}>
+              <Text className="text-sm text-gray-500 leading-5">
+                {hasActivePlan
+                  ? "当前规划暂无推荐资源，请在规划详情页面生成完整的规划后，再来查看 AI 为您推荐的实用资源。"
+                  : "暂无进行中的规划，请在首页创建规划后，AI 将根据您的规划目的地为推荐相关实用资源。"}
+              </Text>
+            </View>
           </View>
         )}
       </ScrollView>

@@ -90,8 +90,7 @@ export default function CreatePlanFormScreen() {
   const handleGenerateComplete = (planId: number) => {
     reset();
     router.replace({
-      pathname: "/(plan)/plan-detail",
-      params: { id: String(planId) },
+      pathname: "/(tabs)/plan",
     });
   };
 

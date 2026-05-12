@@ -1,7 +1,7 @@
 import * as planApi from "@/src/api/plan";
 import type { Destination, PlanFormData, PlanType } from "@/src/types/plan";
 import EventSource from "react-native-sse";
-import { CheckCircle2, Loader2, Sparkles, ChevronRight, AlertCircle, RefreshCw, MapPin } from "lucide-react-native";
+import { CheckCircle2, Loader2, Sparkles, AlertCircle, RefreshCw, MapPin } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Markdown from "react-native-markdown-display";
@@ -193,6 +193,7 @@ export default function GenerateResult({ abroadType, destination, formData, onCo
       const fullPlan = await planApi.getPlanDetail(savedPlan.id);
       await storage.setCurrentPlan(fullPlan);
 
+      // 重置表单并跳转到规划页面
       onComplete?.(savedPlan.id);
     } catch (error) {
       console.error("保存规划失败:", error);
@@ -341,8 +342,7 @@ export default function GenerateResult({ abroadType, destination, formData, onCo
           activeOpacity={0.8}
           onPress={handleConfirm}
         >
-          <Text style={styles.primaryButtonText}>确认并保存规划</Text>
-          <ChevronRight size={20} color="#FFFFFF" />
+          <Text style={styles.primaryButtonText}>确认</Text>
         </TouchableOpacity>
       </Animated.View>
     </View>
