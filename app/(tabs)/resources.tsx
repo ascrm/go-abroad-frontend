@@ -1,4 +1,5 @@
 import type { Resource, ResourceCategory } from "@/src/types/resource";
+import type { Plan, RecommendedResource } from "@/src/types/plan";
 import { getCategoryList, getResourceList } from "@/src/api/resource";
 import { Image } from "expo-image";
 import * as Linking from "expo-linking";
@@ -14,7 +15,8 @@ import {
   ShoppingBag,
   Smartphone,
   Star,
-  Utensils
+  Utensils,
+  Bookmark
 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from "react-native";
@@ -36,6 +38,87 @@ const iconMap: Record<string, React.ComponentType<any>> = {
 function getIcon(name: string): React.ComponentType<any> {
   return iconMap[name] ?? Star;
 }
+
+// 分类颜色映射
+const categoryColorMap: Record<string, string> = {
+  "签证": "#F59E0B",
+  "住宿": "#3B82F6",
+  "交通": "#10B981",
+  "餐饮": "#EF4444",
+  "购物": "#EC4899",
+  "支付": "#8B5CF6",
+  "通讯": "#6366F1",
+  "安全": "#F97316",
+  "语言学习": "#0EA5E9",
+  "学术资源": "#14B8A6",
+  "求职招聘": "#84CC16",
+  "其他": "#6B7280",
+};
+
+function getCategoryColor(category: string): string {
+  return categoryColorMap[category] ?? "#6B7280";
+}
+
+// 通用工具固定配置
+interface ToolApp {
+  title: string;
+  description: string;
+  icon: string;
+  url: string;
+  webUrl?: string;
+  color: string;
+}
+
+const TOOL_APPS: ToolApp[] = [
+  {
+    title: "Google Maps",
+    description: "全球地图导航",
+    icon: "https://www.gstatic.com/images/branding/product/1x/maps_64dp.png",
+    url: "comgooglemaps://",
+    webUrl: "https://www.google.com/maps",
+    color: "#4285F4",
+  },
+  {
+    title: "Google Translate",
+    description: "即时语音翻译",
+    icon: "https://www.gstatic.com/images/branding/product/1x/translate_64dp.png",
+    url: "googletranslate://",
+    webUrl: "https://translate.google.com",
+    color: "#4285F4",
+  },
+  {
+    title: "Uber",
+    description: "全球出行打车",
+    icon: "https://ts2.tc.mm.bing.net/th/id/OIP-C.a2QMcuXud9pqcQFq2REmEQHaHa?cb=thfc1&rs=1&pid=ImgDetMain&o=7&rm=3",
+    url: "uber://",
+    webUrl: "https://m.uber.com",
+    color: "#000000",
+  },
+  {
+    title: "Wise",
+    description: "国际汇款/线下支付",
+    icon: "https://ts3.tc.mm.bing.net/th/id/OIP-C.CBZnEmIuyE2Rjbuh9qbINwAAAA?cb=thfc1&rs=1&pid=ImgDetMain&o=7&rm=3",
+    url: "wise://",
+    webUrl: "https://wise.com",
+    color: "#009452",
+  },
+  {
+    title: "Booking",
+    description: "全球酒店预订",
+    icon: "https://ts3.tc.mm.bing.net/th/id/OIP-C.OYAYSjTzqDebrq-OXTL0SQAAAA?cb=thfc1&rs=1&pid=ImgDetMain&o=7&rm=3",
+    url: "booking://",
+    webUrl: "https://www.booking.com",
+    color: "#003580",
+  },
+  {
+    title: "Amazon Shopping",
+    description: "全球购物配送",
+    icon: "https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg",
+    url: "amazon://",
+    webUrl: "https://www.amazon.com",
+    color: "#FF9900",
+  },
+];
 
 interface ResourceCardProps {
   resource: Resource;
@@ -191,12 +274,104 @@ function CategorySection({ category, resources, onOpenLink }: CategorySectionPro
   );
 }
 
+interface RecommendCardProps {
+  resource: RecommendedResource;
+  onPress: () => void;
+}
+
+function RecommendCard({ resource, onPress }: RecommendCardProps) {
+  const color = getCategoryColor(resource.category);
+  const IconComp = iconMap[resource.category] ?? Star;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      className="rounded-2xl p-5 mb-3"
+      style={{
+        width: "100%",
+        backgroundColor: "white",
+        borderWidth: 1,
+        borderColor: "#F0F0F0",
+      }}
+    >
+      <View className="flex-row items-center">
+        <View
+          className="w-12 h-12 rounded-xl items-center justify-center mr-3"
+          style={{ backgroundColor: `${color}15` }}
+        >
+          <IconComp size={24} color={color} />
+        </View>
+        <View className="flex-1">
+          <View className="flex-row items-center mb-1">
+            <Text className="text-base font-semibold text-gray-900">{resource.title}</Text>
+            <View
+              className="ml-2 px-2 py-0.5 rounded-md"
+              style={{ backgroundColor: `${color}15` }}
+            >
+              <Text className="text-xs" style={{ color }}>{resource.category}</Text>
+            </View>
+          </View>
+          <Text className="text-sm text-gray-500" numberOfLines={2}>
+            {resource.description}
+          </Text>
+        </View>
+        <ExternalLink size={16} color="#9CA3AF" />
+      </View>
+      {resource.cta && (
+        <View
+          className="rounded-lg py-2 items-center flex-row justify-center mt-3"
+          style={{ backgroundColor: color }}
+        >
+          <Text className="text-white text-xs font-medium mr-1">{resource.cta}</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+interface ToolAppCardProps {
+  tool: ToolApp;
+  onPress: () => void;
+}
+
+function ToolAppCard({ tool, onPress }: ToolAppCardProps) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      className="rounded-2xl p-4 mr-3"
+      style={{
+        width: 220,
+        backgroundColor: "white",
+        borderWidth: 1,
+        borderColor: "#F0F0F0",
+      }}
+    >
+      <View className="w-16 h-16 rounded-2xl items-center justify-center mb-3 overflow-hidden" style={{ backgroundColor: "#F9F9F9" }}>
+        <Image
+          source={{ uri: tool.icon }}
+          style={{ width: 48, height: 48 }}
+          contentFit="contain"
+          cachePolicy="memory-disk"
+        />
+      </View>
+      <Text className="text-base font-bold text-gray-900 mb-1">{tool.title}</Text>
+      <Text className="text-sm text-gray-500 mb-4" numberOfLines={2}>{tool.description}</Text>
+      <View className="rounded-lg py-2.5 items-center" style={{ backgroundColor: "#18181B" }}>
+        <Text className="text-white text-sm font-medium">打开应用</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 export default function ResourcesScreen() {
-  const [toolApps, setToolApps] = useState<Resource[]>([]);
   const [countryResources, setCountryResources] = useState<Resource[]>([]);
   const [categories, setCategories] = useState<ResourceCategory[]>([]);
+  const [recommendations, setRecommendations] = useState<RecommendedResource[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState("日本");
+  const [planType, setPlanType] = useState<string>("");
 
   const handleOpenLink = async (url: string, webUrl?: string) => {
     try {
@@ -210,18 +385,26 @@ export default function ResourcesScreen() {
   useFocusEffect(
     useCallback(() => {
       const loadAll = async () => {
-        const plan = await storage.getGeneratingPlan();
-        const country = plan?.destination.country ?? "日本";
+        // 获取当前规划（优先获取最新完成的规划）
+        const plan = await storage.getCurrentPlan();
+        const country = plan?.destination?.country ?? "日本";
         setSelectedCountry(country);
+        setPlanType(plan?.type ?? "");
+
+        // 从规划中读取推荐资源
+        if (plan?.resource && plan.resource.length > 0) {
+          setRecommendations(plan.resource);
+        } else {
+          setRecommendations([]);
+        }
+
         setLoading(true);
         try {
-          const [categoriesData, toolData, countryData] = await Promise.all([
+          const [categoriesData, countryData] = await Promise.all([
             getCategoryList(),
-            getResourceList("全球"),
             getResourceList(country),
           ]);
           setCategories(categoriesData.filter((c) => c.isActive && c.name !== "实用工具"));
-          setToolApps(toolData.filter((r) => r.isActive));
           setCountryResources(countryData.filter((r) => r.isActive));
         } catch (error) {
           console.error("加载资源失败:", error);
@@ -233,20 +416,33 @@ export default function ResourcesScreen() {
     }, [])
   );
 
+  // 根据规划类型生成推荐标题
+  const getRecommendTitle = () => {
+    switch (planType) {
+      case "tourism":
+        return "旅游推荐";
+      case "study":
+        return "留学推荐";
+      case "work":
+        return "工作推荐";
+      case "immigration":
+        return "移民推荐";
+      default:
+        return "为你推荐";
+    }
+  };
+
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-gray-50">
-      {/* 头部 */}
-      <View className="px-5 pt-4 pb-3 bg-white border-b border-gray-100">
+      {/* 头部 - 无背景色 */}
+      <View className="px-5 pt-4 pb-3">
         <View className="flex-row items-center justify-between">
           <View>
             <Text className="text-2xl font-bold text-gray-900">实用资源</Text>
-            <View className="flex-row items-center mt-1">
-              <MapPin size={14} color="#6B7280" />
-              <Text className="text-sm text-gray-500 ml-1">{selectedCountry}</Text>
-            </View>
           </View>
-          <View className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center">
-            <Flag size={18} color="#6B7280" />
+          <View className="flex-row items-center px-3 py-1.5 rounded-full">
+            <MapPin size={16} color="#3B82F6" />
+            <Text className="text-base font-medium text-blue-600 ml-1">{selectedCountry}</Text>
           </View>
         </View>
       </View>
@@ -262,63 +458,47 @@ export default function ResourcesScreen() {
           </View>
         )}
 
-        {/* 工具类横滑卡片 */}
-        {!loading && toolApps.length > 0 && (
+        {/* AI 推荐资源 - 来自规划生成 */}
+        {!loading && recommendations.length > 0 && (
+          <View className="px-5 pt-5">
+            <View className="flex-row items-center mb-3">
+              <Bookmark size={18} color="#6B7280" className="mr-2" />
+              <Text className="text-base font-semibold text-gray-900">
+                {getRecommendTitle()}
+              </Text>
+              <View className="ml-2 px-2 py-0.5 rounded-full bg-blue-50">
+                <Text className="text-xs text-blue-600">AI 智能推荐</Text>
+              </View>
+            </View>
+            {recommendations.map((item, index) => (
+              <RecommendCard
+                key={index}
+                resource={item}
+                onPress={() => handleOpenLink(item.url, item.webUrl)}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* 通用工具 - 固定数据 */}
+        {!loading && (
           <View className="px-5 pt-5">
             <Text className="text-base font-semibold text-gray-900 mb-3">
-              旅行工具
+              通用工具
             </Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               decelerationRate="fast"
-              contentContainerStyle={{ gap: 12 }}
+              contentContainerStyle={{ paddingRight: 20 }}
             >
-              {toolApps.map((tool) => {
-                const IconComp = getIcon(
-                  categories.find((c) => c.id === tool.categoryId)?.icon ?? "Smartphone"
-                );
-                const color =
-                  categories.find((c) => c.id === tool.categoryId)?.color ?? "#0EA5E9";
-                return (
-                  <TouchableOpacity
-                    key={tool.id}
-                    activeOpacity={0.85}
-                    onPress={() => handleOpenLink(tool.url, tool.webUrl)}
-                    className="rounded-2xl p-5"
-                    style={{
-                      width: 200,
-                      backgroundColor: "white",
-                      borderWidth: 1,
-                      borderColor: "#F0F0F0",
-                    }}
-                  >
-                    <View
-                      className="w-12 h-12 rounded-xl items-center justify-center mb-3"
-                      style={{ backgroundColor: `${color}15` }}
-                    >
-                      <IconComp size={24} color={color} />
-                    </View>
-                    <Text className="text-base font-bold text-gray-900 mb-1">
-                      {tool.title}
-                    </Text>
-                    <Text
-                      className="text-sm text-gray-500 leading-snug"
-                      numberOfLines={2}
-                    >
-                      {tool.description}
-                    </Text>
-                    <View
-                      className="rounded-lg py-2 items-center flex-row justify-center mt-3"
-                      style={{ backgroundColor: color }}
-                    >
-                      <Text className="text-white text-xs font-medium mr-1">
-                        {tool.meta?.cta ?? "打开"}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+              {TOOL_APPS.map((tool) => (
+                <ToolAppCard
+                  key={tool.title}
+                  tool={tool}
+                  onPress={() => handleOpenLink(tool.url, tool.webUrl)}
+                />
+              ))}
             </ScrollView>
           </View>
         )}

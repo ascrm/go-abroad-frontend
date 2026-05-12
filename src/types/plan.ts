@@ -199,8 +199,19 @@ export interface Plan {
   endDate?: string;
   planDate?: string;
   phases?: Phase[];
+  resource?: RecommendedResource[];
   createdAt: string;
   updatedAt: string;
+}
+
+// 推荐资源
+export interface RecommendedResource {
+  title: string;
+  description: string;
+  url: string;
+  webUrl?: string;
+  category: string;
+  cta?: string;
 }
 
 // 阶段

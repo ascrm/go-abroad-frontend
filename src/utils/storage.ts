@@ -9,6 +9,7 @@ const AUTH_KEYS = {
 
 const PLAN_KEYS = {
   GENERATING_PLAN: 'generating_plan',
+  CURRENT_PLAN: 'current_plan',
 };
 
 export const storage = {
@@ -54,6 +55,19 @@ export const storage = {
       await AsyncStorage.setItem(PLAN_KEYS.GENERATING_PLAN, JSON.stringify(plan));
     } else {
       await AsyncStorage.removeItem(PLAN_KEYS.GENERATING_PLAN);
+    }
+  },
+
+  async getCurrentPlan(): Promise<Plan | null> {
+    const data = await AsyncStorage.getItem(PLAN_KEYS.CURRENT_PLAN);
+    return data ? JSON.parse(data) : null;
+  },
+
+  async setCurrentPlan(plan: Plan | null): Promise<void> {
+    if (plan) {
+      await AsyncStorage.setItem(PLAN_KEYS.CURRENT_PLAN, JSON.stringify(plan));
+    } else {
+      await AsyncStorage.removeItem(PLAN_KEYS.CURRENT_PLAN);
     }
   },
 };

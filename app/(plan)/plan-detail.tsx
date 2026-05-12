@@ -5,6 +5,7 @@ import { LayoutAnimation, ScrollView, Text, TouchableOpacity, View } from "react
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as planApi from "@/src/api/plan";
 import type { Plan, Phase, PlanType } from "@/src/types/plan";
+import { storage } from "@/src/utils/storage";
 
 const typeConfig = {
   tourism: { icon: Plane, label: "旅游", color: "#3B82F6", bgColor: "#EBF5FF" },
@@ -25,6 +26,8 @@ export default function PlanDetailScreen() {
     try {
       const data = await planApi.getPlanDetail(Number(id));
       setPlan(data);
+      // 保存到本地存储，作为当前规划的引用
+      await storage.setCurrentPlan(data);
     } catch (error) {
       console.error("加载规划详情失败:", error);
     } finally {

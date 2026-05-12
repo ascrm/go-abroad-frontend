@@ -83,7 +83,8 @@ export const API_ENDPOINTS = {
     uploadImage: '/resources/upload/image', // 上传图片
   },
   profile: {
-    browseHistory: '/profile/browse-history',
-    playlists: '/profile/playlists',
+    myArticles: '/profile/my-articles',
+    myFavoriteArticles: '/profile/my-favorite-articles',
+    myBrowsedArticles: '/profile/my-browsed-articles',
   },
 };

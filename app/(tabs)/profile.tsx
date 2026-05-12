@@ -1,6 +1,6 @@
 import { User as UserType } from "@/src/types/auth";
 import { profileApi } from "@/src/api/profile";
-import { getArticleBatch, getQuestionBatch, ArticleItem, QuestionItem } from "@/src/api/home";
+import { getQuestionBatch, QuestionItem } from "@/src/api/home";
 import { getPlanList, Plan } from "@/src/api/plan";
 import { storage } from "@/src/utils/storage";
 import { Image } from "expo-image";
@@ -10,14 +10,16 @@ import { useCallback, useState } from "react";
 import { ActivityIndicator, ImageBackground, Pressable, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate } from "react-native-reanimated";
+import type { ArticleResponse } from "@/src/types/home";
 
 type HistoryTab = 'article' | 'question';
 
 export default function ProfileScreen() {
   const [user, setUser] = useState<UserType | null>(null);
-  const [articleHistory, setArticleHistory] = useState<ArticleItem[]>([]);
-  const [articleFavorites, setArticleFavorites] = useState<ArticleItem[]>([]);
+  const [articleHistory, setArticleHistory] = useState<ArticleResponse[]>([]);
+  const [articleFavorites, setArticleFavorites] = useState<ArticleResponse[]>([]);
   const [questionHistory, setQuestionHistory] = useState<QuestionItem[]>([]);
+  const [myArticles, setMyArticles] = useState<ArticleResponse[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [historyTab, setHistoryTab] = useState<HistoryTab>('article');
@@ -52,37 +54,19 @@ export default function ProfileScreen() {
         setUser(userData);
       }
 
-      // 1. 获取历史记录
-      const historyData = await profileApi.getBrowseHistory();
-      const historyList = historyData.list || [];
+      // 1. 获取我创作的文章
+      const myArticlesData = await profileApi.getMyArticles();
+      setMyArticles(myArticlesData || []);
 
-      // 2. 根据 sourceType 分组获取 articleIds 和 questionIds
-      const articleIds = historyList
-        .filter(item => item.sourceType === 'article')
-        .map(item => item.sourceId);
-      const questionIds = historyList
-        .filter(item => item.sourceType === 'question')
-        .map(item => item.sourceId);
+      // 2. 获取我收藏的文章
+      const favoriteArticlesData = await profileApi.getMyFavoriteArticles();
+      setArticleFavorites(favoriteArticlesData || []);
 
-      // 3. 批量获取文章和问答详情
-      const [articles, questions] = await Promise.all([
-        articleIds.length > 0 ? getArticleBatch(articleIds) : [],
-        questionIds.length > 0 ? getQuestionBatch(questionIds) : [],
-      ]);
+      // 3. 获取我浏览过的文章
+      const browsedArticlesData = await profileApi.getMyBrowsedArticles();
+      setArticleHistory(browsedArticlesData || []);
 
-      setArticleHistory(articles);
-      setQuestionHistory(questions);
-
-      // 4. 获取收藏列表
-      const favoritesData = await profileApi.getPlaylists();
-      const favoritesList = favoritesData.list || [];
-      const favoriteArticleIds = favoritesList
-        .filter(item => item.sourceType === 'article')
-        .map(item => item.sourceId);
-      const favoriteArticles = favoriteArticleIds.length > 0 ? await getArticleBatch(favoriteArticleIds) : [];
-      setArticleFavorites(favoriteArticles);
-
-      // 5. 获取规划列表
+      // 4. 获取规划列表
       const plansData = await getPlanList({ page: 1, pageSize: 10 });
       setPlans(plansData.list || []);
     } catch (error) {
@@ -224,25 +208,25 @@ return (
 
             {historyTab === 'article' ? (
               <View className="px-4">
-                {/* 历史记录板块 */}
+                {/* 我创作的文章 */}
                 <View className="mb-6">
-                  <Text className="text-base font-semibold text-gray-800 mb-3">历史记录</Text>
+                  <Text className="text-base font-semibold text-gray-800 mb-3">我的创作</Text>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={{ paddingRight: 16 }}
                   >
-                    {articleHistory.length > 0 ? (
-                      articleHistory.map((item) => (
+                    {myArticles.length > 0 ? (
+                      myArticles.map((item) => (
                         <Pressable
                           key={item.id}
                           className="bg-white rounded-2xl mr-3 overflow-hidden active:scale-95"
                           style={{ width: 160 }}
                           accessibilityLabel={item.title}
                         >
-                          {item.thumbnail ? (
+                          {item.image ? (
                             <Image
-                              source={{ uri: item.thumbnail }}
+                              source={{ uri: item.image }}
                               style={{ width: 160, height: 100 }}
                               contentFit="cover"
                             />
@@ -256,21 +240,21 @@ return (
                               {item.title}
                             </Text>
                             <Text className="text-xs text-gray-400">
-                              {item.author} · {item.views}
+                              {item.author?.nickname || '未知作者'} · {item.views}
                             </Text>
                           </View>
                         </Pressable>
                       ))
                     ) : (
                       <View className="flex-1 items-center justify-center py-8">
-                        <Text className="text-gray-400 text-sm">暂无文章记录</Text>
+                        <Text className="text-gray-400 text-sm">暂无创作</Text>
                       </View>
                     )}
                   </ScrollView>
                 </View>
 
                 {/* 收藏记录板块 */}
-                <View>
+                <View className="mb-6">
                   <Text className="text-base font-semibold text-gray-800 mb-3">收藏记录</Text>
                   <ScrollView
                     horizontal
@@ -285,9 +269,9 @@ return (
                           style={{ width: 160 }}
                           accessibilityLabel={item.title}
                         >
-                          {item.thumbnail ? (
+                          {item.image ? (
                             <Image
-                              source={{ uri: item.thumbnail }}
+                              source={{ uri: item.image }}
                               style={{ width: 160, height: 100 }}
                               contentFit="cover"
                             />
@@ -301,7 +285,7 @@ return (
                               {item.title}
                             </Text>
                             <Text className="text-xs text-gray-400">
-                              {item.author} · {item.views}
+                              {item.author?.nickname || '未知作者'} · {item.views}
                             </Text>
                           </View>
                         </Pressable>
@@ -309,6 +293,51 @@ return (
                     ) : (
                       <View className="flex-1 items-center justify-center py-8">
                         <Text className="text-gray-400 text-sm">暂无收藏记录</Text>
+                      </View>
+                    )}
+                  </ScrollView>
+                </View>
+
+                {/* 浏览记录板块 */}
+                <View>
+                  <Text className="text-base font-semibold text-gray-800 mb-3">浏览记录</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ paddingRight: 16 }}
+                  >
+                    {articleHistory.length > 0 ? (
+                      articleHistory.map((item) => (
+                        <Pressable
+                          key={item.id}
+                          className="bg-white rounded-2xl mr-3 overflow-hidden active:scale-95"
+                          style={{ width: 160 }}
+                          accessibilityLabel={item.title}
+                        >
+                          {item.image ? (
+                            <Image
+                              source={{ uri: item.image }}
+                              style={{ width: 160, height: 100 }}
+                              contentFit="cover"
+                            />
+                          ) : (
+                            <View className="h-24 bg-gray-100 items-center justify-center">
+                              <FileText size={28} color="#9CA3AF" />
+                            </View>
+                          )}
+                          <View className="p-3">
+                            <Text className="text-sm font-semibold text-gray-800 leading-snug mb-1" numberOfLines={2}>
+                              {item.title}
+                            </Text>
+                            <Text className="text-xs text-gray-400">
+                              {item.author?.nickname || '未知作者'} · {item.views}
+                            </Text>
+                          </View>
+                        </Pressable>
+                      ))
+                    ) : (
+                      <View className="flex-1 items-center justify-center py-8">
+                        <Text className="text-gray-400 text-sm">暂无浏览记录</Text>
                       </View>
                     )}
                   </ScrollView>

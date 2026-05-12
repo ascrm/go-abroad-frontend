@@ -199,7 +199,7 @@ export interface CreateCommentParams {
 // 互动相关类型
 // ============================================
 
-export type InteractionTargetType = 'article' | 'question' | 'answer';
+export type InteractionTargetType = 'article' | 'question' | 'answer' | 'user';
 export type InteractionAction = 'favorite' | 'like' | 'follow' | 'view';
 
 export interface InteractionParams {

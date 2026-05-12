@@ -358,7 +358,7 @@ function QuestionCard({ question, onPress }: {
             </View>
             <View style={[styles.statItem, { marginLeft: 12 }]}>
               <MessageCircle size={14} color="#9CA3AF" />
-              <Text style={styles.statText}>{formatCount(question.repliesCount)}</Text>
+              <Text style={styles.statText}>{formatCount(question.topAnswer?.repliesCount || 0)}</Text>
             </View>
             <View style={[styles.statItem, { marginLeft: 12 }]}>
               <ChartNoAxesColumn size={14} color="#9CA3AF" />

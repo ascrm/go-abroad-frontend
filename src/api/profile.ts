@@ -1,25 +1,15 @@
 import client from './client';
 import { API_ENDPOINTS } from '../constants/api';
-
-export interface BrowseHistoryItem {
-  id: number;
-  sourceType: 'article' | 'question';
-  sourceId: number;
-  browsedAt: string;
-}
+import { ArticleResponse } from '@/src/types/home';
 
 export const profileApi = {
-  getBrowseHistory: (): Promise<BrowseHistoryResponse> => {
-    return client.get(API_ENDPOINTS.profile.browseHistory);
+  getMyArticles: (): Promise<ArticleResponse[]> => {
+    return client.get(API_ENDPOINTS.profile.myArticles);
   },
-  getPlaylists: (): Promise<BrowseHistoryResponse> => {
-    return client.get(API_ENDPOINTS.profile.playlists);
+  getMyFavoriteArticles: (): Promise<ArticleResponse[]> => {
+    return client.get(API_ENDPOINTS.profile.myFavoriteArticles);
   },
-};
-
-export interface BrowseHistoryResponse {
-  list: BrowseHistoryItem[];
-  total: number;
-  page: number;
-  pageSize: number;
+  getMyBrowsedArticles: (): Promise<ArticleResponse[]> => {
+    return client.get(API_ENDPOINTS.profile.myBrowsedArticles);
+  },
 };
