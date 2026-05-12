@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { Bookmark, BookmarkCheck, ChevronLeft, MessageCircle, Plus, Send, Share2, ThumbsUp } from "lucide-react-native";
+import { Bookmark, ChevronLeft, MessageCircle, Plus, Send, ThumbsUp, UserCheck } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as homeApi from "@/src/api/home";
 import { HtmlRenderer } from "@/src/components/HtmlRenderer";
@@ -14,7 +14,7 @@ export default function QADetailScreen() {
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [likedAnswers, setLikedAnswers] = useState<Record<number, boolean>>({});
   const [bookmarkedAnswers, setBookmarkedAnswers] = useState<Record<number, boolean>>({});
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [followedAuthors, setFollowedAuthors] = useState<Record<number, boolean>>({});
   const [replyText, setReplyText] = useState("");
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -37,16 +37,18 @@ export default function QADetailScreen() {
       ]);
       setQuestion(questionData);
       setAnswers(answersData?.list || []);
-      setIsFavorite(questionData.isFavorited || false);
 
       const likeState: Record<number, boolean> = {};
       const bookmarkState: Record<number, boolean> = {};
+      const followState: Record<number, boolean> = {};
       (answersData?.list || []).forEach((answer) => {
         likeState[answer.id] = answer.isLiked || false;
-        bookmarkState[answer.id] = false;
+        bookmarkState[answer.id] = answer.isFavorited || false;
+        followState[answer.authorId] = answer.isFollowed || false;
       });
       setLikedAnswers(likeState);
       setBookmarkedAnswers(bookmarkState);
+      setFollowedAuthors(followState);
     } catch (error) {
       console.error("加载问答详情失败:", error);
     } finally {
@@ -91,27 +93,18 @@ export default function QADetailScreen() {
     setExpandedAnswers(prev => ({ ...prev, [answerId]: !isExpanded }));
   };
 
-  // 切换收藏问题
-  const handleToggleFavorite = async () => {
-    if (!question) return;
-    const currentState = isFavorite;
-    setIsFavorite(!currentState);
-    try {
-      await homeApi.toggleFavorite({
-        targetId: question.id,
-        targetType: "question",
-        action: "favorite",
-      });
-    } catch (error) {
-      setIsFavorite(currentState);
-      console.error("收藏操作失败:", error);
-    }
-  };
-
   // 切换点赞回答
   const handleToggleLike = async (answerId: number) => {
+    const answer = answers.find(a => a.id === answerId);
+    if (!answer) return;
+
     const currentState = likedAnswers[answerId] || false;
+    // 乐观更新：直接更新状态和计数
     setLikedAnswers((prev) => ({ ...prev, [answerId]: !currentState }));
+    setAnswers(prev => prev.map(a =>
+      a.id === answerId ? { ...a, likes: currentState ? a.likes - 1 : a.likes + 1 } : a
+    ));
+
     try {
       await homeApi.toggleLike({
         targetId: answerId,
@@ -119,15 +112,27 @@ export default function QADetailScreen() {
         action: "like",
       });
     } catch (error) {
+      // 回滚
       setLikedAnswers((prev) => ({ ...prev, [answerId]: currentState }));
+      setAnswers(prev => prev.map(a =>
+        a.id === answerId ? { ...a, likes: answer.likes } : a
+      ));
       console.error("点赞操作失败:", error);
     }
   };
 
   // 切换收藏回答
   const handleToggleBookmark = async (answerId: number) => {
+    const answer = answers.find(a => a.id === answerId);
+    if (!answer) return;
+
     const currentState = bookmarkedAnswers[answerId] || false;
+    // 乐观更新：直接更新状态和计数
     setBookmarkedAnswers((prev) => ({ ...prev, [answerId]: !currentState }));
+    setAnswers(prev => prev.map(a =>
+      a.id === answerId ? { ...a, favorites: currentState ? a.favorites - 1 : a.favorites + 1 } : a
+    ));
+
     try {
       await homeApi.toggleFavorite({
         targetId: answerId,
@@ -135,8 +140,29 @@ export default function QADetailScreen() {
         action: "favorite",
       });
     } catch (error) {
+      // 回滚
       setBookmarkedAnswers((prev) => ({ ...prev, [answerId]: currentState }));
+      setAnswers(prev => prev.map(a =>
+        a.id === answerId ? { ...a, favorites: answer.favorites } : a
+      ));
       console.error("收藏操作失败:", error);
+    }
+  };
+
+  // 切换关注用户
+  const handleToggleFollow = async (authorId: number) => {
+    const currentState = followedAuthors[authorId] || false;
+    setFollowedAuthors((prev) => ({ ...prev, [authorId]: !currentState }));
+    try {
+      await homeApi.toggleFollow({
+        targetId: authorId,
+        targetType: "user",
+        action: "follow",
+      });
+      Alert.alert(currentState ? "已取消关注" : "关注成功");
+    } catch (error) {
+      setFollowedAuthors((prev) => ({ ...prev, [authorId]: currentState }));
+      console.error("关注操作失败:", error);
     }
   };
 
@@ -237,18 +263,6 @@ export default function QADetailScreen() {
         <TouchableOpacity onPress={() => router.back()} className="p-1">
           <ChevronLeft size={24} color="#374151" />
         </TouchableOpacity>
-        <View className="flex-row items-center gap-4">
-          <TouchableOpacity onPress={handleToggleFavorite} className="p-1">
-            {isFavorite ? (
-              <BookmarkCheck size={20} color="#3B82F6" fill="#3B82F6" />
-            ) : (
-              <Bookmark size={20} color="#374151" />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity className="p-1">
-            <Share2 size={20} color="#374151" />
-          </TouchableOpacity>
-        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
@@ -308,9 +322,25 @@ export default function QADetailScreen() {
                     </View>
                   </View>
                 </View>
-                <TouchableOpacity className="flex-row items-center gap-1 px-3 py-1.5 border border-blue-500 rounded-full">
-                  <Plus size={14} color="#3B82F6" />
-                  <Text className="text-sm text-blue-500 font-medium">关注</Text>
+                <TouchableOpacity
+                  className={`flex-row items-center gap-1 px-3 py-1.5 rounded-full ${
+                    followedAuthors[answer.authorId]
+                      ? "bg-gray-100 border border-gray-300"
+                      : "border border-blue-500"
+                  }`}
+                  onPress={() => handleToggleFollow(answer.authorId)}
+                >
+                  {followedAuthors[answer.authorId] ? (
+                    <>
+                      <UserCheck size={14} color="#6B7280" />
+                      <Text className="text-sm text-gray-500 font-medium">已关注</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={14} color="#3B82F6" />
+                      <Text className="text-sm text-blue-500 font-medium">关注</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
 
@@ -349,7 +379,7 @@ export default function QADetailScreen() {
                     fill={bookmarkedAnswers[answer.id] ? "#3B82F6" : "none"}
                   />
                   <Text className={`text-sm ${bookmarkedAnswers[answer.id] ? "text-blue-600" : "text-gray-400"}`}>
-                    收藏
+                    {answer.favorites || 0}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity

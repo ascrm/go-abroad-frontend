@@ -149,7 +149,7 @@ function LoginButton({
       <TouchableOpacity
         className={`flex-row items-center py-4 px-4 rounded-2xl mb-3 ${
           method.isPrimary
-            ? "bg-primary-500 shadow-lg"
+            ? "bg-gray-800 shadow-lg"
             : "bg-white border border-gray-100"
         }`}
         onPress={method.onPress}

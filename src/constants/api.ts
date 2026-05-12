@@ -1,5 +1,5 @@
 // API 地址配置
-export const API_BASE_URL = 'http://192.168.131.195:8080/api';
+export const API_BASE_URL = 'http://172.20.10.3:8080/api';
 
 export const API_ENDPOINTS = {
   auth: {
@@ -80,6 +80,7 @@ export const API_ENDPOINTS = {
   resources: {
     list: '/resources/list',      // 按国家获取资源列表（按分类聚合，含工具 App）
     categories: '/resources/categories', // 获取资源分类列表
+    uploadImage: '/resources/upload/image', // 上传图片
   },
   profile: {
     browseHistory: '/profile/browse-history',

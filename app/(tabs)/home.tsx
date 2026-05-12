@@ -7,7 +7,9 @@ import { router } from "expo-router";
 import {
   Bookmark,
   ChartNoAxesColumn,
+  EllipsisVertical,
   MessageCircle,
+  Plus,
   Search,
   Sparkles,
   ThumbsUp,
@@ -159,23 +161,52 @@ function XTabSwitcher({ activeTab, onTabChange }: { activeTab: TabType; onTabCha
 // ============================================
 // 文章大卡片
 // ============================================
-function ArticleLargeCard({ article, onToggleFavorite, onPress }: {
+function ArticleLargeCard({ article, onToggleFavorite, onPress, onShowOptions }: {
   article: Article;
   onToggleFavorite: () => void;
   onPress: () => void;
+  onShowOptions: () => void;
 }) {
+  // 获取作者首字
+  const getAvatarText = (nickname?: string) => {
+    if (!nickname) return '游';
+    return nickname.charAt(0);
+  };
+
   return (
     <AnimatedPressable onPress={onPress} style={styles.articleCardWrapper}>
       <View style={[styles.articleCard, styles.articleCardLarge]}>
         {article.image && <Image source={{ uri: article.image }} style={styles.articleImageLarge} contentFit="cover" />}
         <View style={styles.articleContentLarge}>
-          <View style={styles.articleMeta}>
-            {article.tag && <View style={styles.tag}><Text style={styles.tagText}>{article.tag}</Text></View>}
-            <Text style={styles.timeText}>{formatRelativeTime(article.createdAt)}</Text>
+          {/* 第一行：作者信息 + 更多按钮 */}
+          <View style={styles.articleHeaderRow}>
+            {article.author && (
+              <View style={styles.authorRowLarge}>
+                {article.author.avatar ? (
+                  <Image source={{ uri: article.author.avatar }} style={styles.avatarLarge} contentFit="cover" />
+                ) : (
+                  <View style={styles.avatarLargePlaceholder}>
+                    <Text style={styles.avatarTextLarge}>{getAvatarText(article.author.nickname)}</Text>
+                  </View>
+                )}
+                <Text style={styles.authorNameLarge} numberOfLines={1}>
+                  {article.author.nickname || "旅行用户"}
+                </Text>
+              </View>
+            )}
+            <Pressable onPress={onShowOptions} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.moreBtnIcon}>
+              <EllipsisVertical size={18} color="#9CA3AF" />
+            </Pressable>
           </View>
+
+          {/* 第二行：标题 */}
           <Text style={styles.articleTitleLarge} numberOfLines={2}>{article.title}</Text>
-          {article.description && <Text style={styles.articleDescLarge} numberOfLines={3}>{article.description}</Text>}
-          <View style={styles.articleFooter}>
+
+          {/* 第三行：描述 */}
+          {article.description && <Text style={styles.articleDescLarge} numberOfLines={2}>{article.description}</Text>}
+
+          {/* 第四行：底部 - 左侧收藏/浏览，右侧标签 */}
+          <View style={styles.articleFooterRow}>
             <View style={styles.articleActions}>
               <AnimatedBookmark filled={article.isFavorited || false} count={article.favorites} onPress={onToggleFavorite} />
               <View style={styles.actionBtn}>
@@ -183,6 +214,11 @@ function ArticleLargeCard({ article, onToggleFavorite, onPress }: {
                 <Text style={styles.actionCount}>{article.views}</Text>
               </View>
             </View>
+            {article.tag && (
+              <View style={styles.tagBlue}>
+                <Text style={styles.tagTextBlue}>{article.tag}</Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -193,30 +229,74 @@ function ArticleLargeCard({ article, onToggleFavorite, onPress }: {
 // ============================================
 // 文章小卡片（右侧缩略图）
 // ============================================
-function ArticleSmallCard({ article, onToggleFavorite, onPress }: {
+function ArticleSmallCard({ article, onToggleFavorite, onPress, onShowOptions }: {
   article: Article;
   onToggleFavorite: () => void;
   onPress: () => void;
+  onShowOptions: () => void;
 }) {
+  // 获取作者首字
+  const getAvatarText = (nickname?: string) => {
+    if (!nickname) return '游';
+    return nickname.charAt(0);
+  };
+
   return (
     <AnimatedPressable onPress={onPress} style={styles.articleCardWrapper}>
       <View style={[styles.articleCard, styles.articleCardSmall]}>
-        <View style={styles.articleContentSmall}>
-          <View style={styles.articleMeta}>
-            {article.tag && <View style={styles.tag}><Text style={styles.tagText}>{article.tag}</Text></View>}
-            <Text style={styles.timeText}>{formatRelativeTime(article.createdAt)}</Text>
+        {/* 第一行：作者信息 + 更多按钮 */}
+        <View style={styles.smallCardRow1}>
+          <View style={styles.authorRowSmall}>
+            {article.author ? (
+              <>
+                {article.author.avatar ? (
+                  <Image source={{ uri: article.author.avatar }} style={styles.avatarSmall} contentFit="cover" />
+                ) : (
+                  <View style={styles.avatarSmallPlaceholder}>
+                    <Text style={styles.avatarTextSmallCard}>{getAvatarText(article.author.nickname)}</Text>
+                  </View>
+                )}
+                <Text style={styles.authorNameSmallCard} numberOfLines={1}>
+                  {article.author.nickname || "旅行用户"}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.authorNameSmallCard}>旅行用户</Text>
+            )}
           </View>
-          <Text style={styles.articleTitleSmall} numberOfLines={2}>{article.title}</Text>
-          {article.description && <Text style={styles.articleDescSmall} numberOfLines={2}>{article.description}</Text>}
-          <View style={styles.articleFooterSmall}>
-            <AnimatedBookmark filled={article.isFavorited || false} count={article.favorites} onPress={onToggleFavorite} />
-          </View>
+          <Pressable onPress={onShowOptions} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.moreBtnIconSmall}>
+            <EllipsisVertical size={16} color="#9CA3AF" />
+          </Pressable>
         </View>
-        {article.image && (
-          <View style={styles.articleThumbWrapper}>
-            <Image source={{ uri: article.image }} style={styles.articleThumb} contentFit="cover" />
+
+        {/* 第二行：标题+描述 + 缩略图 */}
+        <View style={styles.smallCardRow2}>
+          <View style={styles.smallCardTextContent}>
+            <Text style={styles.articleTitleSmall} numberOfLines={2}>{article.title}</Text>
+            {article.description && <Text style={styles.articleDescSmall} numberOfLines={2}>{article.description}</Text>}
           </View>
-        )}
+          {article.image && (
+            <View style={styles.articleThumbWrapper}>
+              <Image source={{ uri: article.image }} style={styles.articleThumb} contentFit="cover" />
+            </View>
+          )}
+        </View>
+
+        {/* 第三行：收藏/浏览 + 标签 */}
+        <View style={styles.smallCardRow3}>
+          <View style={styles.articleActionsSmall}>
+            <AnimatedBookmark filled={article.isFavorited || false} count={article.favorites} onPress={onToggleFavorite} />
+            <View style={styles.actionBtnSmall}>
+              <ChartNoAxesColumn size={14} color="#9CA3AF" />
+              <Text style={styles.actionCountSmall}>{article.views}</Text>
+            </View>
+          </View>
+          {article.tag && (
+            <View style={styles.tagBlueSmall}>
+              <Text style={styles.tagTextBlueSmall}>{article.tag}</Text>
+            </View>
+          )}
+        </View>
       </View>
     </AnimatedPressable>
   );
@@ -316,6 +396,39 @@ function LoadingFooter({ hasMore, isLoading }: { hasMore: boolean; isLoading: bo
     <View style={styles.loadingFooter}>
       <Text style={styles.loadingText}>加载中...</Text>
     </View>
+  );
+}
+
+// ============================================
+// 固定添加按钮
+// ============================================
+function FixedAddButton({ onPress }: { onPress: () => void }) {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.85, { damping: 15, stiffness: 400 });
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 15, stiffness: 400 });
+  };
+
+  return (
+    <Animated.View style={[styles.fixedAddBtn, animatedStyle]}>
+      <Pressable
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onPress={onPress}
+      >
+        <View style={styles.fixedAddBtnInner}>
+          <Plus size={24} color="#FFFFFF" />
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -436,12 +549,14 @@ export default function HomeScreen() {
               article={item}
               onToggleFavorite={() => handleToggleFavorite(item.id, "article")}
               onPress={() => router.push({ pathname: "/(home)/article-detail", params: { id: String(item.id) } })}
+              onShowOptions={() => showOptions(item.id)}
             />
           ) : (
             <ArticleSmallCard
               article={item}
               onToggleFavorite={() => handleToggleFavorite(item.id, "article")}
               onPress={() => router.push({ pathname: "/(home)/article-detail", params: { id: String(item.id) } })}
+              onShowOptions={() => showOptions(item.id)}
             />
           )
         }
@@ -553,6 +668,9 @@ export default function HomeScreen() {
         direction={menuDirection}
         onClose={() => setModalVisible(false)}
       />
+
+      {/* 固定添加按钮 */}
+      <FixedAddButton onPress={() => router.push("/(home)/write-article")} />
     </SafeAreaView>
   );
 }
@@ -578,17 +696,39 @@ const styles = StyleSheet.create({
   flatListContent: { paddingBottom: 100 },
   // 文章卡片
   articleCardWrapper: { marginBottom: 16 },
+  // 大卡片标题行（作者+更多按钮）
+  articleHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+  // 更多按钮
+  moreBtnIcon: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  moreBtnIconSmall: { width: 28, height: 28, alignItems: "center", justifyContent: "center" },
+  // 大卡片作者信息
+  authorRowLarge: { flexDirection: "row", alignItems: "center", gap: 8 },
+  avatarLarge: { width: 28, height: 28, borderRadius: 14 },
+  avatarLargePlaceholder: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#F0F9FF", alignItems: "center", justifyContent: "center" },
+  avatarTextLarge: { fontSize: 12, fontWeight: "600", color: "#0EA5E9" },
+  authorNameLarge: { fontSize: 13, color: "#6B7280", fontWeight: "500" },
+  // 小卡片作者信息
+  authorRowSmall: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1 },
+  avatarSmall: { width: 22, height: 22, borderRadius: 11 },
+  avatarSmallPlaceholder: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#F0F9FF", alignItems: "center", justifyContent: "center" },
+  avatarTextSmallCard: { fontSize: 10, fontWeight: "600", color: "#0EA5E9" },
+  authorNameSmallCard: { fontSize: 12, color: "#6B7280", fontWeight: "500" },
   articleCard: {
     backgroundColor: "#FFFFFF", borderRadius: 16, overflow: "hidden",
     borderWidth: 1, borderColor: "#E5E7EB",
     shadowColor: "#000000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
   },
   articleCardLarge: {},
-  articleCardSmall: { flexDirection: "row" },
+  // 小卡片三行布局
+  articleCardSmall: { flexDirection: "column", padding: 16 },
+  smallCardRow1: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  smallCardRow2: { flexDirection: "row", alignItems: "flex-start", flex: 1 },
+  smallCardRow3: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 10 },
+  smallCardTextContent: { flex: 1 },
   articleImageLarge: { width: "100%", height: 200 },
   articleContentLarge: { padding: 20 },
-  articleContentSmall: { flex: 1, padding: 16 },
-  articleThumbWrapper: { width: 96, height: 96, alignSelf: "center", marginVertical: "auto", marginRight: 12 },
+  articleContentSmall: { flex: 1, padding: 16, flexShrink: 0 },
+  articleThumbWrapper: { width: 96, height: 96, marginLeft: 12 },
   articleThumb: { width: 96, height: 96, borderRadius: 12 },
   articleMeta: { flexDirection: "row", alignItems: "center", marginBottom: 10, gap: 8 },
   articleTitleLarge: { fontSize: 18, fontWeight: "700", color: "#111827", lineHeight: 24 },
@@ -633,9 +773,21 @@ const styles = StyleSheet.create({
   // 分类标签
   categoryTag: { backgroundColor: "#EFF6FF", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
   categoryTagText: { fontSize: 12, fontWeight: "600", color: "#3B82F6" },
-  // 标签
-  tag: { backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: "#E5E7EB" },
-  tagText: { fontSize: 12, fontWeight: "600", color: "#374151" },
+  // 蓝色标签
+  tagBlue: { backgroundColor: "#EFF6FF", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  tagTextBlue: { fontSize: 12, fontWeight: "600", color: "#3B82F6" },
+  tagBlueSmall: { backgroundColor: "#EFF6FF", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 5 },
+  tagTextBlueSmall: { fontSize: 11, fontWeight: "600", color: "#3B82F6" },
+  // 文章底部行
+  articleFooterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12 },
+  articleFooterRowSmall: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 },
+  articleActions: { flexDirection: "row", alignItems: "center", gap: 16 },
+  articleActionsSmall: { flexDirection: "row", alignItems: "center", gap: 12 },
+  actionBtn: { flexDirection: "row", alignItems: "center", gap: 5, minWidth: 44, minHeight: 44, justifyContent: "center" },
+  actionBtnSmall: { flexDirection: "row", alignItems: "center", gap: 4, minWidth: 36, minHeight: 36, justifyContent: "center" },
+  actionCount: { fontSize: 13, color: "#9CA3AF", fontWeight: "500" },
+  actionCountSmall: { fontSize: 12, color: "#9CA3AF", fontWeight: "500" },
+  actionCountActive: { color: "#3B82F6" },
   timeText: { fontSize: 12, color: "#9CA3AF" },
   // 空状态
   emptyState: { alignItems: "center", paddingVertical: 60 },
@@ -645,6 +797,21 @@ const styles = StyleSheet.create({
   // 加载更多
   loadingFooter: { paddingVertical: 20, alignItems: "center" },
   loadingText: { fontSize: 14, color: "#9CA3AF" },
+  // 固定添加按钮
+  fixedAddBtn: { position: "absolute", bottom: 24, right: 24 },
+  fixedAddBtnInner: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#3B82F6",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#3B82F6",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   // 骨架屏
   skeletonCard: { backgroundColor: "#FFFFFF", borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: "#E5E7EB", marginBottom: 16 },
   skeletonCardFirst: {},

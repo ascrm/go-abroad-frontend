@@ -26,6 +26,7 @@ export interface Article {
   updatedAt: string;
   isFavorited?: boolean; // 当前用户是否收藏
   isLiked?: boolean; // 当前用户是否点赞
+  isFollowed?: boolean; // 当前用户是否关注了作者
 }
 
 export interface ArticleListParams {
@@ -123,6 +124,8 @@ export interface Answer {
   author?: User;
   content: string;
   likes: number;
+  favorites: number;
+  views: number;
   repliesCount: number;
   isOfficial: boolean;
   isBestAnswer: boolean;
@@ -130,6 +133,8 @@ export interface Answer {
   createdAt: string;
   updatedAt: string;
   isLiked?: boolean; // 当前用户是否点赞
+  isFavorited?: boolean; // 当前用户是否收藏
+  isFollowed?: boolean; // 当前用户是否关注了作者
 }
 
 export interface AnswerListParams {

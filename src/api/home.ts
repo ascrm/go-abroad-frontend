@@ -78,6 +78,21 @@ export async function deleteArticle(id: number): Promise<void> {
   return client.delete(`${API_ENDPOINTS.home.articleDelete}/${id}`);
 }
 
+/**
+ * 上传图片到 MinIO
+ */
+export async function uploadImage(file: { uri: string; name: string; type: string }): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', {
+    uri: file.uri,
+    name: file.name || 'image.jpg',
+    type: file.type || 'image/jpeg',
+  } as any);
+  return client.post(API_ENDPOINTS.resources.uploadImage, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+}
+
 // ============================================
 // 问答-问题相关 API
 // ============================================
