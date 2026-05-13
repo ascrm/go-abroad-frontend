@@ -2,7 +2,7 @@ import * as planApi from "@/src/api/plan";
 import type { Phase, Plan, Task } from "@/src/types/plan";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import PlanEmptyState from "../../components/page/plan/PlanEmptyState";
 import { usePlanStore } from "@/src/stores/planStore";
@@ -11,6 +11,11 @@ import {
   ChevronRight, Check, Target, Sparkles, Bell, Trophy, Paperclip, Clock, Flag
 } from "lucide-react-native";
 import { formatDate, formatDateTime } from "@/src/utils/time";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import {
+  scheduleTaskReminder,
+  cancelTaskReminder,
+} from "@/src/utils/notifications";
 
 // ============================================
 // Design System - Monochrome with Animation
@@ -385,9 +390,10 @@ function AnimatedTaskRow({ task, pendingIndex, isSelected, onSelect, onComplete 
 // ============================================
 // 子组件 - 当前任务卡片
 // ============================================
-function CurrentTaskDetailCard({ task, onComplete }: {
+function CurrentTaskDetailCard({ task, onComplete, onBellPress }: {
   task: Task | null;
   onComplete?: () => void;
+  onBellPress?: (task: Task) => void;
 }) {
   const [showAiSuggestion, setShowAiSuggestion] = useState(false);
 
@@ -419,6 +425,15 @@ function CurrentTaskDetailCard({ task, onComplete }: {
               </Text>
             </View>
           )}
+          <TouchableOpacity
+            style={styles.bellButton}
+            onPress={() => onBellPress?.(task)}
+            activeOpacity={0.7}
+            accessibilityLabel="设置提醒"
+            accessibilityRole="button"
+          >
+            <Bell size={18} color={task.reminderTime ? "#3B82F6" : "#93C5FD"} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -541,6 +556,18 @@ export default function PlanScreen() {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const contentFadeAnim = useRef(new Animated.Value(0)).current;
   const phasesRef = useRef<Phase[]>([]);
+  // 提醒时间选择器状态
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [tempReminderDate, setTempReminderDate] = useState<Date | null>(null);
+  const [currentBellTask, setCurrentBellTask] = useState<Task | null>(null);
+  const [reminderLoading, setReminderLoading] = useState(false);
+  // 时间选择器动画
+  const pickerAnim = useRef(new Animated.Value(0)).current;
+  const pickerTranslateY = pickerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [500, 0],
+  });
+  const backdropAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     phasesRef.current = phases;
@@ -577,6 +604,11 @@ export default function PlanScreen() {
         const defaultPhase = phasesWithTasks.find(p => p.tasks && !p.tasks.every(t => t.status === 'completed')) || phasesWithTasks[0];
         if (defaultPhase) {
           setSelectedPhaseId(defaultPhase.id);
+          // 默认选中第一个未完成的任务
+          const firstPendingTask = defaultPhase.tasks?.find(t => t.status !== 'completed');
+          if (firstPendingTask) {
+            setSelectedTaskId(firstPendingTask.id);
+          }
         }
       } else {
         setGeneratingPlan(null);
@@ -645,6 +677,65 @@ export default function PlanScreen() {
     setSelectedPhaseId(phaseId);
   };
 
+  // 闹钟按钮点击处理
+  const handleBellPress = (task: Task) => {
+    const initialDate = task.reminderTime
+      ? new Date(task.reminderTime)
+      : new Date(Date.now() + 60 * 60 * 1000);
+    setTempReminderDate(initialDate);
+    setCurrentBellTask(task);
+    setShowDatePicker(true);
+    // 显示动画
+    Animated.parallel([
+      Animated.timing(backdropAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+      Animated.spring(pickerAnim, { toValue: 1, useNativeDriver: true, tension: 80, friction: 10 }),
+    ]).start();
+  };
+
+  const closePicker = (callback?: () => void) => {
+    Animated.parallel([
+      Animated.timing(backdropAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(pickerAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start(() => {
+      setShowDatePicker(false);
+      callback?.();
+    });
+  };
+
+  // 更新提醒时间
+  const handleUpdateReminderTime = async (date: Date) => {
+    if (!currentBellTask) return;
+    setReminderLoading(true);
+    try {
+      const reminderTime = date.toISOString();
+      const updated = await planApi.updateTask({
+        id: currentBellTask.id,
+        reminderTime,
+      });
+      // 更新本地任务数据
+      setPhases(prev => prev.map(phase => ({
+        ...phase,
+        tasks: phase.tasks?.map(t =>
+          t.id === currentBellTask.id ? { ...t, reminderTime: updated.reminderTime } : t
+        ),
+      })));
+      // 调度系统通知
+      if (updated.reminderTime) {
+        await scheduleTaskReminder(currentBellTask.id, currentBellTask.title, new Date(updated.reminderTime));
+      } else {
+        await cancelTaskReminder(currentBellTask.id);
+      }
+    } catch (error) {
+      console.error("更新提醒时间失败:", error);
+      Alert.alert("更新失败", "无法保存提醒时间，请重试");
+    } finally {
+      setReminderLoading(false);
+      closePicker(() => {
+        setCurrentBellTask(null);
+      });
+    }
+  };
+
   const getProgress = () => {
     if (phases.length === 0) return { completed: 0, total: 0, percent: 0 };
     const allTasks = phases.flatMap(p => p.tasks || []);
@@ -676,7 +767,7 @@ export default function PlanScreen() {
 
   if (!loading && !generatingPlan && plans.length === 0) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]}>
+      <SafeAreaView edges={["top"]} style={[styles.container, { backgroundColor: COLORS.background }]}>
         <PlanEmptyState
           onCreatePlan={() => router.push("/(plan)/create-plan")}
           colors={COLORS}
@@ -687,7 +778,7 @@ export default function PlanScreen() {
 
   if (hasPlansButNoGenerating) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]}>
+      <SafeAreaView edges={["top"]} style={[styles.container, { backgroundColor: COLORS.background }]}>
         <PlanEmptyState
           onViewPlans={() => router.push("/(plan)/plan-list")}
           colors={COLORS}
@@ -712,7 +803,7 @@ export default function PlanScreen() {
   const showContent = isHydrated || (!loading && (generatingPlan || !showSkeleton));
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]}>
+    <SafeAreaView edges={["top"]} style={[styles.container, { backgroundColor: COLORS.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} bounces={true}>
         {/* 头部 */}
         <View style={styles.header}>
@@ -829,8 +920,72 @@ export default function PlanScreen() {
                     handleTaskComplete(globalCurrentTask.id, phase.id);
                   }
                 }}
+                onBellPress={handleBellPress}
               />
             ) : null}
+
+            {/* 提醒时间选择器 */}
+            {showDatePicker && Platform.OS === 'android' && (
+              <DateTimePicker
+                value={tempReminderDate || new Date()}
+                mode="datetime"
+                display="default"
+                onChange={(event: DateTimePickerEvent, date?: Date) => {
+                  closePicker();
+                  if (event.type === 'set' && date) {
+                    handleUpdateReminderTime(date);
+                  }
+                }}
+                minimumDate={new Date()}
+              />
+            )}
+
+            {/* 底部弹出时间选择器 */}
+            {showDatePicker && Platform.OS === 'ios' && (
+              <Animated.View style={styles.pickerOverlay}>
+                <Animated.View style={[styles.pickerBackdrop, { opacity: backdropAnim }]}>
+                  <TouchableOpacity
+                    style={{ flex: 1 }}
+                    activeOpacity={1}
+                    onPress={() => closePicker()}
+                  />
+                </Animated.View>
+                <Animated.View style={[styles.pickerContainer, { transform: [{ translateY: pickerTranslateY }] }]}>
+                  <Animated.View style={[styles.pickerContent]}>
+                    <View style={styles.pickerHandle} />
+                    <View style={styles.pickerHeader}>
+                      <TouchableOpacity onPress={() => closePicker()}>
+                        <Text style={styles.pickerCancel}>取消</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.pickerTitle}>设置提醒时间</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (tempReminderDate) {
+                            handleUpdateReminderTime(tempReminderDate);
+                          }
+                        }}
+                        disabled={reminderLoading || !tempReminderDate}
+                      >
+                        <Text style={[styles.pickerSave, reminderLoading && styles.pickerSaveDisabled]}>
+                          {reminderLoading ? "保存中..." : "保存"}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    <DateTimePicker
+                      value={tempReminderDate || new Date()}
+                      mode="datetime"
+                      display="spinner"
+                      onChange={(event: DateTimePickerEvent, date?: Date) => {
+                        if (date) {
+                          setTempReminderDate(date);
+                        }
+                      }}
+                      minimumDate={new Date()}
+                    />
+                  </Animated.View>
+                </Animated.View>
+              </Animated.View>
+            )}
           </Animated.View>
         )}
       </ScrollView>
@@ -1029,9 +1184,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.muted,
   },
   taskDetailBadgeText: { fontSize: 11, fontWeight: "600", color: COLORS.textSecondary },
-  taskDetailActions: { flexDirection: "row", gap: 4 },
+  taskDetailActions: { flexDirection: "row", gap: 4, alignItems: "center" },
   taskDetailActionBtn: {
     width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.muted,
+    alignItems: "center", justifyContent: "center",
+  },
+  bellButton: {
+    width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.muted,
     alignItems: "center", justifyContent: "center",
   },
   taskDetailTitle: {
@@ -1089,4 +1248,65 @@ const styles = StyleSheet.create({
   celebrationStats: { flexDirection: "row", alignItems: "center", gap: 16 },
   celebrationStatItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   celebrationStatText: { fontSize: 14, fontWeight: "600", color: COLORS.success },
+
+  // DateTimePicker Modal
+  pickerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1000,
+  },
+  pickerBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  pickerContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 0,
+  },
+  pickerContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34,
+  },
+  pickerHandle: {
+    width: 36,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#E5E7EB',
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  pickerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  pickerCancel: {
+    fontSize: 17,
+    color: '#9CA3AF',
+  },
+  pickerSave: {
+    fontSize: 17,
+    fontWeight: '500',
+    color: '#8B5CF6',
+  },
+  pickerSaveDisabled: {
+    color: '#C4B5FE',
+  },
+  picker: {
+    height: 216,
+  },
 });

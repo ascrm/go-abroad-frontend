@@ -5,7 +5,6 @@ import * as Linking from "expo-linking";
 import {
   Car,
   ExternalLink,
-  MapPin,
   ShieldAlert,
   ShoppingBag,
   Smartphone,
@@ -15,9 +14,11 @@ import {
   Info,
 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
+import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import { useArticleList, useQuestionList } from "@/src/hooks/useHome";
 
 // icon 名称 → Lucide 组件映射
 const iconMap: Record<string, React.ComponentType<any>> = {
@@ -202,10 +203,11 @@ function ToolAppCard({ tool, onPress }: ToolAppCardProps) {
 
 export default function ResourcesScreen() {
   const [recommendations, setRecommendations] = useState<RecommendedResource[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
-  const [planType, setPlanType] = useState<string>("");
   const [hasActivePlan, setHasActivePlan] = useState(false);
+
+  // TanStack Query - 使用 home 的 hook 查询数据
+  const { data: articleData } = useArticleList();
+  const { data: questionData } = useQuestionList();
 
   const handleOpenLink = async (url: string, webUrl?: string) => {
     try {
@@ -219,7 +221,6 @@ export default function ResourcesScreen() {
   useFocusEffect(
     useCallback(() => {
       const loadPlanData = async () => {
-        setLoading(true);
         try {
           // 查询正在进行中的规划
           const response = await getPlanList({ status: "generating", pageSize: 1 });
@@ -228,10 +229,6 @@ export default function ResourcesScreen() {
           if (plans.length > 0) {
             const plan = plans[0];
             setHasActivePlan(true);
-            setSelectedCountry(plan.destination?.country ?? null);
-            setPlanType(plan.type ?? "");
-
-            // 从规划中读取推荐资源
             if (plan.resource && plan.resource.length > 0) {
               setRecommendations(plan.resource);
             } else {
@@ -245,9 +242,6 @@ export default function ResourcesScreen() {
             if (latestPlans.length > 0) {
               const plan = latestPlans[0];
               setHasActivePlan(true);
-              setSelectedCountry(plan.destination?.country ?? null);
-              setPlanType(plan.type ?? "");
-
               if (plan.resource && plan.resource.length > 0) {
                 setRecommendations(plan.resource);
               } else {
@@ -255,95 +249,64 @@ export default function ResourcesScreen() {
               }
             } else {
               setHasActivePlan(false);
-              setSelectedCountry(null);
               setRecommendations([]);
             }
           }
         } catch (error) {
           console.error("加载规划数据失败:", error);
           setHasActivePlan(false);
-        } finally {
-          setLoading(false);
         }
       };
       loadPlanData();
     }, [])
   );
 
-  // 根据规划类型生成推荐标题
-  const getRecommendTitle = () => {
-    switch (planType) {
-      case "tourism":
-        return "旅游推荐";
-      case "study":
-        return "留学推荐";
-      case "work":
-        return "工作推荐";
-      case "immigration":
-        return "移民推荐";
-      default:
-        return "为你推荐";
-    }
-  };
+  const allArticles = articleData?.pages.flatMap((p) => p.list) ?? [];
+  const allQuestions = questionData?.pages.flatMap((p) => p.list) ?? [];
 
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-gray-50">
       {/* 头部 - 无背景色 */}
-      <View className="px-5 pt-4 pb-3">
+      <Animated.View entering={FadeInDown.duration(400)} className="px-5 pt-4 pb-3">
         <View className="flex-row items-center justify-between">
           <View>
             <Text className="text-2xl font-bold text-gray-900">实用资源</Text>
           </View>
-          {selectedCountry && (
-            <View className="flex-row items-center px-3 py-1.5 rounded-full">
-              <MapPin size={16} color="#3B82F6" />
-              <Text className="text-base font-medium text-blue-600 ml-1">{selectedCountry}</Text>
-            </View>
-          )}
         </View>
-      </View>
+      </Animated.View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 30 }}
       >
-        {/* 加载中 */}
-        {loading && (
-          <View className="items-center justify-center py-16">
-            <ActivityIndicator size="large" color="#6B7280" />
-          </View>
-        )}
-
         {/* 通用工具 - 始终显示 */}
-        {!loading && (
-          <View className="px-5 pt-5">
-            <Text className="text-base font-semibold text-gray-900 mb-3">
-              通用工具
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              decelerationRate="fast"
-              contentContainerStyle={{ paddingRight: 20 }}
-            >
-              {TOOL_APPS.map((tool) => (
-                <ToolAppCard
-                  key={tool.title}
-                  tool={tool}
-                  onPress={() => handleOpenLink(tool.url, tool.webUrl)}
-                />
-              ))}
-            </ScrollView>
-          </View>
-        )}
+        <Animated.View entering={FadeInDown.duration(400).delay(50)} className="px-5 pt-5">
+          <Text className="text-base font-semibold text-gray-900 mb-3">
+            通用工具
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            decelerationRate="fast"
+            contentContainerStyle={{ paddingRight: 20 }}
+          >
+            {TOOL_APPS.map((tool) => (
+              <ToolAppCard
+                key={tool.title}
+                tool={tool}
+                onPress={() => handleOpenLink(tool.url, tool.webUrl)}
+              />
+            ))}
+          </ScrollView>
+        </Animated.View>
 
         {/* AI 推荐资源 - 有规划且有资源才显示 */}
-        {!loading && hasActivePlan && recommendations.length > 0 && (
-          <View className="px-5 pt-6">
+        {hasActivePlan && recommendations.length > 0 && (
+          <Animated.View entering={FadeInDown.duration(400).delay(100)} className="px-5 pt-6">
             <View className="flex-row items-center mb-3">
               <Bookmark size={18} color="#6B7280" className="mr-2" />
               <Text className="text-base font-semibold text-gray-900">
-                {getRecommendTitle()}
+                为你推荐
               </Text>
               <View className="ml-2 px-2 py-0.5 rounded-full bg-blue-50">
                 <Text className="text-xs text-blue-600">AI 智能推荐</Text>
@@ -356,12 +319,12 @@ export default function ResourcesScreen() {
                 onPress={() => handleOpenLink(item.url, item.webUrl)}
               />
             ))}
-          </View>
+          </Animated.View>
         )}
 
         {/* 没有进行中的规划时显示提示文字 */}
-        {!loading && (!hasActivePlan || recommendations.length === 0) && (
-          <View className="px-5 pt-6">
+        {(!hasActivePlan || recommendations.length === 0) && (
+          <Animated.View entering={FadeInDown.duration(400).delay(150)} className="px-5 pt-6">
             <View className="flex-row items-center mb-3">
               <Info size={18} color="#6B7280" className="mr-2" />
               <Text className="text-base font-semibold text-gray-900">
@@ -375,7 +338,7 @@ export default function ResourcesScreen() {
                   : "暂无进行中的规划，请在首页创建规划后，AI 将根据您的规划目的地为推荐相关实用资源。"}
               </Text>
             </View>
-          </View>
+          </Animated.View>
         )}
       </ScrollView>
     </SafeAreaView>

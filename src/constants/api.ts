@@ -88,4 +88,7 @@ export const API_ENDPOINTS = {
     myFavoriteArticles: '/profile/my-favorite-articles',
     myBrowsedArticles: '/profile/my-browsed-articles',
   },
+  search: {
+    main: '/search',
+  },
 };

@@ -145,7 +145,7 @@ function RegisterButton({
         className={`flex-row items-center py-4 px-4 rounded-2xl mb-3 ${
           method.isPrimary
             ? "bg-gray-800 shadow-lg"
-            : "bg-white border border-gray-100"
+            : "bg-white border border-gray-100 shadow-sm"
         }`}
         onPress={method.onPress}
         onPressIn={handlePressIn}

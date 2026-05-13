@@ -1,41 +1,33 @@
 import { useEffect, useState } from "react";
-import { Animated, Dimensions, StyleSheet, Text, View } from "react-native";
+import { Animated, Dimensions, Easing, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 
 const { width } = Dimensions.get("window");
 
 export default function SplashScreenComponent({ onReady }: { onReady: () => void }) {
-  const [fadeAnim] = useState(new Animated.Value(0));
-  const [scaleAnim] = useState(new Animated.Value(0.8));
+  const [scaleAnim] = useState(new Animated.Value(1));
 
   useEffect(() => {
-    // 启动动画
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 6,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    // X 软件启动动画：先缩小再放大超出屏幕
+    const shrinkAnimation = Animated.timing(scaleAnim, {
+      toValue: 0.6,
+      duration: 800,
+      useNativeDriver: true,
+    });
 
-    // 模拟加载，2秒后调用 onReady
-    const timer = setTimeout(() => {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => {
-        onReady();
-      });
-    }, 2000);
+    const expandAnimation = Animated.timing(scaleAnim, {
+      toValue: 15,
+      duration: 600,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
 
-    return () => clearTimeout(timer);
+    Animated.sequence([
+      shrinkAnimation,
+      expandAnimation,
+    ]).start(() => {
+      onReady();
+    });
   }, []);
 
   return (
@@ -44,7 +36,6 @@ export default function SplashScreenComponent({ onReady }: { onReady: () => void
         style={[
           styles.content,
           {
-            opacity: fadeAnim,
             transform: [{ scale: scaleAnim }],
           },
         ]}
@@ -55,8 +46,6 @@ export default function SplashScreenComponent({ onReady }: { onReady: () => void
             style={styles.logo}
             contentFit="contain"
           />
-          <Text style={styles.title}>出国助手</Text>
-          <Text style={styles.subtitle}>让留学更简单</Text>
         </View>
       </Animated.View>
     </View>
@@ -77,8 +66,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logo: {
-    width: 100,
-    height: 100,
+    width: 150,
+    height: 150,
     marginBottom: 20,
   },
   title: {

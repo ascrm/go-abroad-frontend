@@ -679,9 +679,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
   header: { paddingHorizontal: 24, paddingTop: 4, paddingBottom: 12 },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  logoRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  logoImg: { width: 28, height: 28 },
-  logoText: { fontSize: 18, fontWeight: "700", color: "#000000", letterSpacing: -0.3 },
+  logoRow: { flexDirection: "row", alignItems: "center", gap: 2 },
+  logoImg: { width: 36, height: 36 },
+  logoText: { fontSize: 20, fontWeight: "700", color: "#000000", fontStyle: "italic", letterSpacing: -0.5 },
   searchIconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   // Tab
   tabWrapper: { paddingHorizontal: 24, marginBottom: 16 },

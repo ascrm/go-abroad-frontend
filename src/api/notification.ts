@@ -23,30 +23,30 @@ export interface NotificationListResponse extends PageR<NotificationResponse[]> 
 
 // 获取通知列表
 export async function getNotificationList(page = 1, pageSize = 20): Promise<NotificationListResponse> {
-  return client.get('/api/notification/list', { params: { page, pageSize } });
+  return client.get('/notification/list', { params: { page, pageSize } });
 }
 
 // 获取未读通知数量
 export async function getUnreadCount(): Promise<{ count: number }> {
-  return client.get('/api/notification/unread-count');
+  return client.get('/notification/unread-count');
 }
 
 // 标记全部已读
 export async function markAllAsRead(): Promise<void> {
-  return client.put('/api/notification/read-all');
+  return client.put('/notification/read-all');
 }
 
 // 标记单条已读
 export async function markAsRead(id: number): Promise<void> {
-  return client.put(`/api/notification/read/${id}`);
+  return client.put(`/notification/read/${id}`);
 }
 
 // 切换置顶状态
 export async function togglePin(id: number): Promise<void> {
-  return client.put(`/api/notification/pin/${id}`);
+  return client.put(`/notification/pin/${id}`);
 }
 
 // 删除通知
 export async function deleteNotification(id: number): Promise<void> {
-  return client.delete(`/api/notification/${id}`);
+  return client.delete(`/notification/${id}`);
 }

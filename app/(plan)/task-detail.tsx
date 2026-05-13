@@ -1,12 +1,17 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { BookOpen, Briefcase, Calculator, ChevronLeft, Clock, Edit2, ExternalLink, FileText, Globe, GraduationCap, Home, Paperclip, Plane, Sparkles, Calendar, AlertCircle, Eye } from "lucide-react-native";
-import { useCallback, useEffect, useState } from "react";
-import { Linking, ScrollView, Text, TouchableOpacity, View, Alert, Platform, StyleSheet } from "react-native";
+import { useCallback, useEffect, useState, useRef } from "react";
+import { Animated, Linking, ScrollView, Text, TouchableOpacity, View, Alert, Platform, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import * as planApi from "@/src/api/plan";
 import * as FileSystem from "expo-file-system/legacy";
 import type { Attachment, Task, TaskPriority, TaskStatus } from "@/src/types/plan";
+import {
+  requestNotificationPermissions,
+  scheduleTaskReminder,
+  cancelTaskReminder,
+} from "@/src/utils/notifications";
 
 const typeConfig = {
   tourism: { icon: Plane, label: "旅游规划", color: "#3B82F6", bgColor: "#EBF5FF" },
@@ -68,6 +73,13 @@ export default function TaskDetailScreen() {
   const [reminderLoading, setReminderLoading] = useState(false);
   const [tempReminderDate, setTempReminderDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  // 时间选择器动画
+  const pickerAnim = useRef(new Animated.Value(0)).current;
+  const pickerTranslateY = pickerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [500, 0],
+  });
+  const backdropAnim = useRef(new Animated.Value(0)).current;
 
   // 加载任务详情
   const loadTaskDetail = useCallback(async () => {
@@ -90,6 +102,17 @@ export default function TaskDetailScreen() {
   useEffect(() => {
     loadTaskDetail();
   }, [loadTaskDetail]);
+
+  // 当任务加载完成后，如果有提醒时间则调度通知
+  useEffect(() => {
+    if (task?.reminderTime) {
+      scheduleTaskReminder(
+        task.id,
+        task.title,
+        new Date(task.reminderTime)
+      );
+    }
+  }, [task?.id, task?.reminderTime, task?.title]);
 
   // 获取 AI 建议
   const handleGetAISuggestion = async () => {
@@ -117,12 +140,46 @@ export default function TaskDetailScreen() {
         reminderTime,
       });
       setTask(prev => prev ? { ...prev, reminderTime: updated.reminderTime } : null);
+
+      // 调度或取消系统通知提醒
+      if (updated.reminderTime) {
+        await scheduleTaskReminder(
+          Number(id),
+          task.title,
+          new Date(updated.reminderTime)
+        );
+      } else {
+        // 清除提醒时间时，取消已调度的通知
+        await cancelTaskReminder(Number(id));
+      }
     } catch (error) {
       console.error("更新提醒时间失败:", error);
       Alert.alert("更新失败", "无法保存提醒时间，请重试");
     } finally {
       setReminderLoading(false);
+      closePicker(() => {
+        // 关闭后的回调
+      });
     }
+  };
+
+  // 关闭picker
+  const closePicker = (callback?: () => void) => {
+    Animated.parallel([
+      Animated.timing(backdropAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(pickerAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start(() => {
+      setShowDatePicker(false);
+      callback?.();
+    });
+  };
+
+  // 显示picker
+  const openPicker = () => {
+    Animated.parallel([
+      Animated.timing(backdropAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+      Animated.spring(pickerAnim, { toValue: 1, useNativeDriver: true, tension: 80, friction: 10 }),
+    ]).start();
   };
 
   const handleOpenLink = async (url: string) => {
@@ -271,6 +328,7 @@ export default function TaskDetailScreen() {
                   : new Date(Date.now() + 60 * 60 * 1000);
                 setTempReminderDate(initialDate);
                 setShowDatePicker(true);
+                openPicker();
               }}
               activeOpacity={0.7}
             >
@@ -372,14 +430,61 @@ export default function TaskDetailScreen() {
         <View className="h-10" />
       </ScrollView>
 
-      {/* 提醒时间选择器 */}
+      {/* 底部弹出时间选择器 */}
+      {showDatePicker && Platform.OS === 'ios' && (
+        <Animated.View style={pickerStyles.pickerOverlay}>
+          <Animated.View style={[pickerStyles.pickerBackdrop, { opacity: backdropAnim }]}>
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              activeOpacity={1}
+              onPress={() => closePicker()}
+            />
+          </Animated.View>
+          <Animated.View style={[pickerStyles.pickerContainer, { transform: [{ translateY: pickerTranslateY }] }]}>
+            <Animated.View style={pickerStyles.pickerContent}>
+              <View style={pickerStyles.pickerHandle} />
+              <View style={pickerStyles.pickerHeader}>
+                <TouchableOpacity onPress={() => closePicker()}>
+                  <Text style={pickerStyles.pickerCancel}>取消</Text>
+                </TouchableOpacity>
+                <Text style={pickerStyles.pickerTitle}>设置提醒时间</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (tempReminderDate) {
+                      handleUpdateReminderTime(tempReminderDate);
+                    }
+                  }}
+                  disabled={reminderLoading || !tempReminderDate}
+                >
+                  <Text style={[pickerStyles.pickerSave, reminderLoading && pickerStyles.pickerSaveDisabled]}>
+                    {reminderLoading ? "保存中..." : "保存"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={tempReminderDate || new Date()}
+                mode="datetime"
+                display="spinner"
+                onChange={(event: DateTimePickerEvent, date?: Date) => {
+                  if (date) {
+                    setTempReminderDate(date);
+                  }
+                }}
+                minimumDate={new Date()}
+              />
+            </Animated.View>
+          </Animated.View>
+        </Animated.View>
+      )}
+
+      {/* Android DateTimePicker */}
       {showDatePicker && Platform.OS === 'android' && (
         <DateTimePicker
           value={tempReminderDate || new Date()}
           mode="datetime"
           display="default"
           onChange={(event: DateTimePickerEvent, date?: Date) => {
-            setShowDatePicker(false);
+            closePicker();
             if (event.type === 'set' && date) {
               handleUpdateReminderTime(date);
             }
@@ -387,49 +492,68 @@ export default function TaskDetailScreen() {
           minimumDate={new Date()}
         />
       )}
-      {showDatePicker && Platform.OS === 'ios' && (
-        <View style={StyleSheet.absoluteFill}>
-          <TouchableOpacity
-            style={{ flex: 1, justifyContent: 'flex-end' }}
-            activeOpacity={1}
-            onPress={() => setShowDatePicker(false)}
-          >
-            <View style={{ backgroundColor: 'rgba(0,0,0,0.5)', flex: 1 }} />
-          </TouchableOpacity>
-          <View style={{ backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 48 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                <Text style={{ fontSize: 16, color: '#6B7280' }}>取消</Text>
-              </TouchableOpacity>
-              <Text style={{ fontSize: 18, fontWeight: '600', color: '#111827' }}>设置提醒时间</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  if (tempReminderDate) {
-                    handleUpdateReminderTime(tempReminderDate);
-                  }
-                  setShowDatePicker(false);
-                }}
-                disabled={reminderLoading || !tempReminderDate}
-              >
-                <Text style={{ fontSize: 16, color: '#8B5CF6', fontWeight: '500' }}>
-                  {reminderLoading ? "保存中..." : "保存"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <DateTimePicker
-              value={tempReminderDate || new Date()}
-              mode="datetime"
-              display="spinner"
-              onChange={(event: DateTimePickerEvent, date?: Date) => {
-                if (date) {
-                  setTempReminderDate(date);
-                }
-              }}
-              minimumDate={new Date()}
-            />
-          </View>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
+
+// ============================================
+// 时间选择器样式
+// ============================================
+const pickerStyles = StyleSheet.create({
+  pickerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1000,
+  },
+  pickerBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  pickerContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 0,
+  },
+  pickerContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34,
+  },
+  pickerHandle: {
+    width: 36,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#E5E7EB',
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  pickerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  pickerCancel: {
+    fontSize: 17,
+    color: '#9CA3AF',
+  },
+  pickerSave: {
+    fontSize: 17,
+    fontWeight: '500',
+    color: '#8B5CF6',
+  },
+  pickerSaveDisabled: {
+    color: '#C4B5FE',
+  },
+});

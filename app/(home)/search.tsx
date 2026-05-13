@@ -1,377 +1,255 @@
-import { useEffect, useState } from "react";
-import {
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { useSafeAreaInsets, SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
-import {
-  ChevronLeft,
-  Clock,
-  History,
-  Search,
-  TrendingUp,
-  X,
-} from "lucide-react-native";
-import type { Article, Question } from "@/src/types/home";
+import { ChevronLeft, Search, X } from "lucide-react-native";
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Alert, FlatList, Keyboard, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { searchAll, type ArticleSearchItem, type PlanSearchItem, type QuestionSearchItem, type UserSearchItem } from "@/src/api/search";
 
-const MOCK_ARTICLES: Article[] = [
-  {
-    id: 1,
-    title: "日本关西7日深度游攻略",
-    description: "京都大阪奈良完整路线",
-    content: "",
-    image: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=400",
-    tag: "日本",
-    authorId: 1,
-    views: 12580,
-    favorites: 892,
-    isPublished: true,
-    isFeatured: true,
-    createdAt: "2026-05-01",
-    updatedAt: "2026-05-01",
-  },
-  {
-    id: 2,
-    title: "欧洲15天自由行",
-    description: "巴黎到罗马经典路线",
-    content: "",
-    image: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=400",
-    tag: "欧洲",
-    authorId: 2,
-    views: 8934,
-    favorites: 567,
-    isPublished: true,
-    isFeatured: false,
-    createdAt: "2026-04-28",
-    updatedAt: "2026-04-28",
-  },
+type SearchResultType = "all" | "article" | "plan" | "qa" | "user";
+
+interface SearchResult {
+  id: string;
+  type: Exclude<SearchResultType, "all">;
+  title: string;
+  subtitle: string;
+  time?: string;
+  tag?: string;
+}
+
+// Tab 配置
+const tabs: { key: SearchResultType; label: string }[] = [
+  { key: "all", label: "全部" },
+  { key: "article", label: "文章" },
+  { key: "plan", label: "规划" },
+  { key: "qa", label: "问答" },
+  { key: "user", label: "用户" },
 ];
 
-const MOCK_QUESTIONS: Question[] = [
-  {
-    id: 1,
-    title: "如何申请日本旅游签证？",
-    content: "需要准备哪些材料",
-    authorId: 1,
-    views: 2345,
-    repliesCount: 12,
-    isResolved: true,
-    isDeleted: false,
-    createdAt: "2026-05-05",
-    updatedAt: "2026-05-06",
-  },
-  {
-    id: 2,
-    title: "欧洲签证申请被拒了怎么办？",
-    content: "想申诉或重新申请",
-    authorId: 2,
-    views: 1890,
-    repliesCount: 8,
-    isResolved: false,
-    isDeleted: false,
-    createdAt: "2026-05-04",
-    updatedAt: "2026-05-04",
-  },
-];
+// 转换后端数据为页面需要的格式
+const convertResults = (data: { articles?: ArticleSearchItem[], plans?: PlanSearchItem[], questions?: QuestionSearchItem[], users?: UserSearchItem[] }): SearchResult[] => {
+  const results: SearchResult[] = [];
 
-const HOT_SEARCHES = ["日本签证", "欧洲旅行", "泰国自由行", "环球影城", "机票预订"];
-const RECENT_SEARCHES_KEY = "recent_searches";
+  data.articles?.forEach(item => {
+    results.push({
+      id: `article-${item.id}`,
+      type: "article",
+      title: item.title,
+      subtitle: item.description || "",
+      time: item.time,
+      tag: item.tag,
+    });
+  });
+
+  data.plans?.forEach(item => {
+    results.push({
+      id: `plan-${item.id}`,
+      type: "plan",
+      title: item.title,
+      subtitle: item.description || "",
+      tag: "规划",
+    });
+  });
+
+  data.questions?.forEach(item => {
+    results.push({
+      id: `qa-${item.id}`,
+      type: "qa",
+      title: item.title,
+      subtitle: item.category || "",
+      tag: "问答",
+    });
+  });
+
+  data.users?.forEach(item => {
+    results.push({
+      id: `user-${item.id}`,
+      type: "user",
+      title: item.nickname || item.username,
+      subtitle: item.username,
+    });
+  });
+
+  return results;
+};
+
+const getTypeColor = (type: SearchResult["type"]) => {
+  switch (type) {
+    case "article":
+      return "#3B82F6";
+    case "plan":
+      return "#10B981";
+    case "qa":
+      return "#8B5CF6";
+    case "user":
+      return "#F59E0B";
+    default:
+      return "#6B7280";
+  }
+};
+
+const getTypeLabel = (type: SearchResult["type"]) => {
+  switch (type) {
+    case "article":
+      return "文章";
+    case "plan":
+      return "规划";
+    case "qa":
+      return "问答";
+    case "user":
+      return "用户";
+    default:
+      return "";
+  }
+};
 
 export default function SearchScreen() {
-  const insets = useSafeAreaInsets();
-  const [searchText, setSearchText] = useState("");
-  const [activeTab, setActiveTab] = useState<"article" | "question">("article");
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<{
-    articles: Article[];
-    questions: Question[];
-  }>({ articles: [], questions: [] });
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [keyword, setKeyword] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<SearchResultType>("all");
 
-  // 加载最近搜索
+  // 根据当前 tab 过滤结果
+  const filteredResults = activeTab === "all"
+    ? searchResults
+    : searchResults.filter(item => item.type === activeTab);
+
+  // 防抖搜索
   useEffect(() => {
-    // 模拟从 storage 加载
-    const saved = [""];
-    if (saved[0]) {
-      setRecentSearches(saved);
-    }
-  }, []);
-
-  // 搜索处理（带防抖）
-  useEffect(() => {
-    if (!searchText.trim()) {
-      setSearchResults({ articles: [], questions: [] });
-      setIsSearching(false);
-      return;
-    }
-
-    setIsSearching(true);
     const timer = setTimeout(() => {
-      // 模拟搜索结果
-      const keyword = searchText.toLowerCase();
-      const articles = MOCK_ARTICLES.filter(
-        (a) =>
-          a.title.toLowerCase().includes(keyword) ||
-          a.description?.toLowerCase().includes(keyword)
-      );
-      const questions = MOCK_QUESTIONS.filter((q) =>
-        q.title.toLowerCase().includes(keyword)
-      );
-      setSearchResults({ articles, questions });
-      setIsSearching(false);
+      if (keyword.trim()) {
+        doSearch(keyword);
+      } else {
+        setSearchResults([]);
+        setHasSearched(false);
+      }
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchText]);
+  }, [keyword]);
 
-  // 保存搜索历史
-  const saveSearch = (keyword: string) => {
-    if (!keyword.trim()) return;
-    const updated = [keyword, ...recentSearches.filter((s) => s !== keyword)].slice(0, 10);
-    setRecentSearches(updated);
-  };
-
-  // 清空搜索
-  const clearSearch = () => {
-    setSearchText("");
-    setSearchResults({ articles: [], questions: [] });
-  };
-
-  // 点击搜索结果
-  const handleResultPress = (type: "article" | "question", id: number) => {
-    saveSearch(searchText);
-    if (type === "article") {
-      router.push({ pathname: "/(home)/article-detail", params: { id: String(id) } });
-    } else {
-      router.push({ pathname: "/(home)/qa-detail", params: { id: String(id) } });
+  const doSearch = async (text: string) => {
+    setLoading(true);
+    try {
+      const data = await searchAll(text);
+      setSearchResults(convertResults(data));
+      setHasSearched(true);
+    } catch (error: any) {
+      Alert.alert("搜索失败", error.message || "请稍后重试");
+      setSearchResults([]);
+      setHasSearched(true);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 热门搜索点击
-  const handleHotPress = (keyword: string) => {
-    setSearchText(keyword);
+  const handleSubmit = () => {
+    Keyboard.dismiss();
+    if (keyword.trim()) {
+      doSearch(keyword);
+    }
   };
 
-  // 最近搜索删除
-  const handleRecentDelete = (keyword: string) => {
-    setRecentSearches(recentSearches.filter((s) => s !== keyword));
+  const handleClear = () => {
+    setKeyword("");
+    setSearchResults([]);
+    setHasSearched(false);
+    Keyboard.dismiss();
   };
 
-  // 清空历史
-  const handleClearHistory = () => {
-    setRecentSearches([]);
-  };
-
-  const hasResults = searchResults.articles.length > 0 || searchResults.questions.length > 0;
-  const showEmpty = searchText && !isSearching && !hasResults;
-  const showHistory = !searchText;
+  const renderItem = ({ item }: { item: SearchResult }) => (
+    <TouchableOpacity style={styles.resultItem} activeOpacity={0.7}>
+      <View style={styles.resultContent}>
+        <View style={styles.resultHeader}>
+          <View style={[styles.typeTag, { backgroundColor: getTypeColor(item.type) + "20" }]}>
+            <Text style={[styles.typeText, { color: getTypeColor(item.type) }]}>
+              {getTypeLabel(item.type)}
+            </Text>
+          </View>
+          {item.tag && (
+            <View style={styles.tagBadge}>
+              <Text style={styles.tagText}>{item.tag}</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.resultSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+      </View>
+      {item.time && <Text style={styles.resultTime}>{item.time}</Text>}
+    </TouchableOpacity>
+  );
 
   return (
     <SafeAreaView edges={["top"]} style={styles.container}>
-      <View style={{ flex: 1, paddingBottom: insets.bottom }}>
-      {/* 顶部搜索栏 */}
+      <StatusBar barStyle="dark-content" />
+
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => router.back()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ChevronLeft size={24} color="#374151" />
         </TouchableOpacity>
-        <View style={styles.searchInputWrapper}>
-          <Search size={18} color="#9CA3AF" style={styles.searchIcon} />
+        <View style={styles.searchInputContainer}>
+          <Search size={20} color="#9CA3AF" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="搜索文章、问答..."
+            placeholder="搜索文章、规划、问答..."
             placeholderTextColor="#9CA3AF"
-            value={searchText}
-            onChangeText={setSearchText}
-            autoFocus
+            value={keyword}
+            onChangeText={setKeyword}
+            onSubmitEditing={handleSubmit}
             returnKeyType="search"
-            onSubmitEditing={() => saveSearch(searchText)}
+            autoFocus
           />
-          {searchText ? (
-            <TouchableOpacity onPress={clearSearch} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          {keyword.length > 0 && (
+            <TouchableOpacity onPress={handleClear} style={styles.clearButton}>
               <X size={18} color="#9CA3AF" />
             </TouchableOpacity>
-          ) : null}
+          )}
         </View>
       </View>
 
-      {/* 内容区域 */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.content}
-        keyboardVerticalOffset={0}
-      >
-        {/* 最近搜索 & 热门搜索 */}
-        {showHistory && (
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {/* 最近搜索 */}
-            {recentSearches.length > 0 && (
-              <Animated.View entering={FadeInDown.duration(300)} style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <View style={styles.sectionTitleRow}>
-                    <Clock size={16} color="#6B7280" />
-                    <Text style={styles.sectionTitle}>最近搜索</Text>
-                  </View>
-                  <TouchableOpacity onPress={handleClearHistory}>
-                    <Text style={styles.clearBtn}>清空</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.tagList}>
-                  {recentSearches.map((keyword, index) => (
-                    <TouchableOpacity
-                      key={`recent-${index}`}
-                      style={styles.tag}
-                      onPress={() => handleHotPress(keyword)}
-                    >
-                      <Text style={styles.tagText}>{keyword}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </Animated.View>
-            )}
+      {/* Tab 标签栏 */}
+      {hasSearched && !loading && searchResults.length > 0 && (
+        <View style={styles.tabContainer}>
+          {tabs.map(tab => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+              onPress={() => setActiveTab(tab.key)}
+            >
+              <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
-            {/* 热门搜索 */}
-            <Animated.View entering={FadeInDown.duration(300).delay(50)} style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionTitleRow}>
-                  <TrendingUp size={16} color="#6B7280" />
-                  <Text style={styles.sectionTitle}>热门搜索</Text>
-                </View>
-              </View>
-              <View style={styles.tagList}>
-                {HOT_SEARCHES.map((keyword, index) => (
-                  <TouchableOpacity
-                    key={`hot-${index}`}
-                    style={styles.tag}
-                    onPress={() => handleHotPress(keyword)}
-                  >
-                    <Text style={styles.tagText}>{keyword}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </Animated.View>
-          </ScrollView>
+      <View style={styles.content}>
+        {!hasSearched ? (
+          <View style={styles.emptyContainer}>
+            <Search size={48} color="#E5E7EB" />
+            <Text style={styles.emptyText}>输入关键词搜索</Text>
+          </View>
+        ) : loading ? (
+          <View style={styles.emptyContainer}>
+            <ActivityIndicator size="large" color="#3B82F6" />
+            <Text style={styles.emptyText}>搜索中...</Text>
+          </View>
+        ) : filteredResults.length > 0 ? (
+          <FlatList
+            data={filteredResults}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContent}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            keyboardShouldPersistTaps="handled"
+          />
+        ) : (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>未找到相关结果</Text>
+            <Text style={styles.emptySubText}>尝试其他关键词搜索</Text>
+          </View>
         )}
-
-        {/* 搜索结果 */}
-        {searchText && (
-          <Animated.View entering={FadeIn.duration(200)} style={styles.results}>
-            {/* Tab 切换 */}
-            <View style={styles.tabWrapper}>
-              <View style={styles.tabContainer}>
-                <View style={[styles.tabIndicator, activeTab === "question" && styles.tabIndicatorRight]} />
-                <TouchableOpacity
-                  style={styles.tabBtn}
-                  onPress={() => setActiveTab("article")}
-                >
-                  <Text style={[styles.tabText, activeTab === "article" && styles.tabTextActive]}>
-                    推荐
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.tabBtn}
-                  onPress={() => setActiveTab("question")}
-                >
-                  <Text style={[styles.tabText, activeTab === "question" && styles.tabTextActive]}>
-                    问答
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* 结果列表 */}
-            {activeTab === "article" ? (
-              <FlatList
-                data={searchResults.articles}
-                keyExtractor={(item) => String(item.id)}
-                renderItem={({ item }) => (
-                  <Pressable
-                    style={styles.resultCard}
-                    onPress={() => handleResultPress("article", item.id)}
-                  >
-                    {item.image && (
-                      <Image source={{ uri: item.image }} style={styles.resultImage} />
-                    )}
-                    <View style={styles.resultContent}>
-                      <Text style={styles.resultTitle} numberOfLines={2}>
-                        {item.title}
-                      </Text>
-                      <Text style={styles.resultDesc} numberOfLines={1}>
-                        {item.description}
-                      </Text>
-                      <View style={styles.resultMeta}>
-                        {item.tag && (
-                          <View style={styles.resultTag}>
-                            <Text style={styles.resultTagText}>{item.tag}</Text>
-                          </View>
-                        )}
-                        <Text style={styles.resultViews}>{item.views} 阅读</Text>
-                      </View>
-                    </View>
-                  </Pressable>
-                )}
-                ListEmptyComponent={
-                  <View style={styles.emptyState}>
-                    <Text style={styles.emptyText}>未找到相关文章</Text>
-                  </View>
-                }
-              />
-            ) : (
-              <FlatList
-                data={searchResults.questions}
-                keyExtractor={(item) => String(item.id)}
-                renderItem={({ item }) => (
-                  <Pressable
-                    style={styles.resultCard}
-                    onPress={() => handleResultPress("question", item.id)}
-                  >
-                    <View style={styles.questionIcon}>
-                      <History size={20} color="#3B82F6" />
-                    </View>
-                    <View style={styles.resultContent}>
-                      <Text style={styles.resultTitle} numberOfLines={2}>
-                        {item.title}
-                      </Text>
-                      <View style={styles.resultMeta}>
-                        <Text style={styles.resultViews}>{item.repliesCount} 回答</Text>
-                        <Text style={styles.resultViews}>{item.views} 浏览</Text>
-                      </View>
-                    </View>
-                  </Pressable>
-                )}
-                ListEmptyComponent={
-                  <View style={styles.emptyState}>
-                    <Text style={styles.emptyText}>未找到相关问答</Text>
-                  </View>
-                }
-              />
-            )}
-          </Animated.View>
-        )}
-
-        {/* 空状态 */}
-        {showEmpty && (
-          <Animated.View entering={FadeIn.duration(200)} style={styles.emptyState}>
-            <Search size={48} color="#D1D5DB" />
-            <Text style={styles.emptyTitle}>未找到结果</Text>
-            <Text style={styles.emptySubtitle}>换个关键词试试吧</Text>
-          </Animated.View>
-        )}
-      </KeyboardAvoidingView>
       </View>
     </SafeAreaView>
   );
@@ -380,28 +258,26 @@ export default function SearchScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "white",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    gap: 12,
+    backgroundColor: "white",
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
+  backButton: {
+    padding: 4,
+    marginRight: 12,
   },
-  searchInputWrapper: {
+  searchInputContainer: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F3F4F6",
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    backgroundColor: "#F5F5F5",
+    borderRadius: 24,
+    paddingHorizontal: 16,
     height: 44,
   },
   searchIcon: {
@@ -411,139 +287,113 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: "#111827",
+    padding: 0,
+  },
+  clearButton: {
+    padding: 4,
   },
   content: {
     flex: 1,
   },
-  section: {
+  tabContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  tab: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    borderRadius: 16,
+    backgroundColor: "#F5F5F5",
+  },
+  tabActive: {
+    backgroundColor: "#1F2937",
+  },
+  tabText: {
+    fontSize: 13,
+    color: "#6B7280",
+    fontWeight: "500",
+  },
+  tabTextActive: {
+    color: "#FFFFFF",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 100,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#9CA3AF",
+    marginTop: 16,
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: "#D1D5DB",
+    marginTop: 8,
+  },
+  listContent: {
+    flexGrow: 1,
+  },
+  resultItem: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 16,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  sectionTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#374151",
-  },
-  clearBtn: {
-    fontSize: 13,
-    color: "#3B82F6",
-  },
-  tagList: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  tag: {
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  tagText: {
-    fontSize: 14,
-    color: "#374151",
-  },
-  results: {
-    flex: 1,
-  },
-  // Tab
-  tabWrapper: { paddingHorizontal: 24, marginBottom: 16 },
-  tabContainer: { flexDirection: "row", position: "relative" },
-  tabIndicator: { position: "absolute", bottom: 0, left: 0, right: "50%", height: 2, backgroundColor: "#3B82F6", borderRadius: 1 },
-  tabIndicatorRight: { left: "50%", right: 0 },
-  tabBtn: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 10 },
-  tabText: { fontSize: 15, fontWeight: "500", color: "#9CA3AF" },
-  tabTextActive: { color: "#000000", fontWeight: "700" },
-  resultCard: {
-    flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 12,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  resultImage: {
-    width: 100,
-    height: 100,
-  },
-  questionIcon: {
-    width: 100,
-    height: 100,
-    backgroundColor: "#EFF6FF",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "white",
   },
   resultContent: {
     flex: 1,
-    padding: 12,
-    justifyContent: "space-between",
   },
-  resultTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#111827",
-    lineHeight: 20,
-  },
-  resultDesc: {
-    fontSize: 13,
-    color: "#6B7280",
-    marginTop: 4,
-  },
-  resultMeta: {
+  resultHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginTop: 8,
+    marginBottom: 4,
   },
-  resultTag: {
-    backgroundColor: "#EFF6FF",
+  typeTag: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
   },
-  resultTagText: {
+  typeText: {
     fontSize: 11,
-    color: "#3B82F6",
+    fontWeight: "600",
+  },
+  tagBadge: {
+    marginLeft: 8,
+    backgroundColor: "#FEF3C7",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  tagText: {
+    fontSize: 11,
+    color: "#D97706",
     fontWeight: "500",
   },
-  resultViews: {
+  resultTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111827",
+    marginBottom: 2,
+  },
+  resultSubtitle: {
+    fontSize: 14,
+    color: "#6B7280",
+  },
+  resultTime: {
     fontSize: 12,
     color: "#9CA3AF",
+    marginLeft: 12,
   },
-  emptyState: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: "#9CA3AF",
-  },
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#374151",
-    marginTop: 12,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: "#9CA3AF",
-    marginTop: 4,
+  separator: {
+    height: 1,
+    backgroundColor: "#F9FAFB",
+    marginLeft: 16,
   },
 });

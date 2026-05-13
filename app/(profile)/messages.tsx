@@ -1,9 +1,10 @@
 import { router } from "expo-router";
-import { Alert, FlatList, Image, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Bell, MessageCircle, Pin, PinOff, Trash2, X } from "lucide-react-native";
 import React, { useState, useRef, useCallback } from "react";
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useFocusEffect } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   getNotificationList,
   markAsRead,
@@ -23,6 +24,19 @@ const getTypeColor = (type: string) => {
     default:
       return "#6B7280";
   }
+};
+
+const getNotificationTitle = (item: NotificationResponse): string => {
+  if (item.type === "system") {
+    return "系统通知";
+  }
+  if (item.type === "comment") {
+    return item.actor?.nickname ? `${item.actor.nickname}评论了你的文章` : "有人评论了你的文章";
+  }
+  if (item.type === "answer") {
+    return item.actor?.nickname ? `${item.actor.nickname}回复了你的提问` : "有人回复了你的问题";
+  }
+  return item.title;
 };
 
 interface SwipeActionProps {
@@ -65,6 +79,11 @@ export default function MessagesScreen() {
       const res = await getNotificationList(1, 50);
       if (res && res.list) {
         setNotifications(res.list);
+        // 清理已删除的 refs
+        swipeableRefs.current.forEach((ref, id) => {
+          const exists = res.list.some(item => item.id === id);
+          if (!exists) swipeableRefs.current.delete(id);
+        });
       }
     } catch (error) {
       console.error("加载通知失败:", error);
@@ -146,6 +165,7 @@ export default function MessagesScreen() {
           }
         }}
       >
+        <View style={styles.messageItemRow}>
         <View style={styles.avatarWrapper}>
           {item.type === "system" ? (
             <View style={[styles.avatarContainer, { backgroundColor: getTypeColor(item.type) + "20" }]}>
@@ -162,19 +182,18 @@ export default function MessagesScreen() {
         </View>
 
         <View style={styles.messageContent}>
-          <View style={styles.titleRow}>
-            <View style={styles.titleLeft}>
-              {item.isPinned && <Pin size={14} color="#F59E0B" style={styles.pinIcon} />}
-              <Text style={[styles.messageTitle, !item.isRead && styles.unreadText]}>
-                {item.title}
-              </Text>
-            </View>
+          <View style={styles.row1}>
+            <Text style={[styles.notificationTitle, !item.isRead && styles.unreadText]} numberOfLines={1}>
+              {getNotificationTitle(item)}
+            </Text>
+            {item.isPinned && <Pin size={12} color="#F59E0B" style={styles.pinIcon} />}
             <Text style={styles.messageTime}>{item.time}</Text>
           </View>
-          <Text style={styles.messageDesc} numberOfLines={2}>
+          <Text style={styles.messageDesc} numberOfLines={1}>
             {item.content}
           </Text>
         </View>
+      </View>
       </TouchableOpacity>
     </Swipeable>
   );
@@ -188,9 +207,7 @@ export default function MessagesScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -202,6 +219,7 @@ export default function MessagesScreen() {
       </View>
 
       <FlatList
+        style={styles.listContainer}
         data={notifications}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
@@ -211,7 +229,7 @@ export default function MessagesScreen() {
         refreshing={loading}
         onRefresh={loadNotifications}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -225,10 +243,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: "white",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-    paddingTop: StatusBar.currentHeight ? StatusBar.currentHeight + 16 : 44,
+    backgroundColor: "#F9FAFB",
   },
   headerLeft: {
     flexDirection: "row",
@@ -243,20 +258,23 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#111827",
   },
+  listContainer: {
+    flex: 1,
+  },
   listContent: {
     flexGrow: 1,
   },
   messageItem: {
     backgroundColor: "white",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  messageItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   pinnedItem: {
     backgroundColor: "#F0F7FF",
-  },
-  messageTouchable: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
   },
   avatarWrapper: {
     position: "relative",
@@ -277,23 +295,17 @@ const styles = StyleSheet.create({
   messageContent: {
     flex: 1,
   },
-  titleRow: {
+  row1: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  titleLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
+    marginBottom: 6,
   },
   pinIcon: {
-    marginRight: 4,
+    marginLeft: 6,
   },
-  messageTitle: {
-    fontSize: 16,
-    fontWeight: "500",
+  notificationTitle: {
+    fontSize: 15,
+    fontWeight: "600",
     color: "#374151",
     flexShrink: 1,
   },
@@ -302,14 +314,15 @@ const styles = StyleSheet.create({
     color: "#111827",
   },
   messageTime: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#9CA3AF",
     marginLeft: 8,
+    flexShrink: 0,
   },
   messageDesc: {
     fontSize: 14,
     color: "#6B7280",
-    lineHeight: 20,
+    flex: 1,
   },
   unreadDot: {
     position: "absolute",

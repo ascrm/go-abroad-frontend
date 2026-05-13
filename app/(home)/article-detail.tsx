@@ -1,12 +1,13 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { Bookmark, BookmarkCheck, ChevronLeft, Plus, UserCheck } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Image, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import * as homeApi from "@/src/api/home";
 import type { Article } from "@/src/types/home";
 import { HtmlRenderer } from "@/src/components/HtmlRenderer";
+import { Image } from "expo-image";
 
 function AlertMessage({ message }: { message: string }) {
   Alert.alert(message);
@@ -134,7 +135,7 @@ export default function ArticleDetailScreen() {
             <View className="px-6 pt-5 pb-4 flex-row items-center justify-between">
               <View className="flex-row items-center gap-4">
                 {article.author.avatar ? (
-                  <Image source={{ uri: article.author.avatar }} style={{ width: 56, height: 56, borderRadius: 28 }} />
+                  <Image source={{ uri: article.author.avatar }} style={{ width: 56, height: 56, borderRadius: 28 }} contentFit="cover"/>
                 ) : (
                   <View className="w-14 h-14 rounded-full bg-blue-50 items-center justify-center">
                     <Text className="text-xl font-semibold text-blue-500">
