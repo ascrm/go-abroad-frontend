@@ -78,9 +78,10 @@ export const API_ENDPOINTS = {
     checkInteraction: '/home/interaction/check',
   },
   resources: {
-    list: '/resources/list',      // 按国家获取资源列表（按分类聚合，含工具 App）
-    categories: '/resources/categories', // 获取资源分类列表
-    uploadImage: '/resources/upload/image', // 上传图片
+    list: '/resources/list',
+    categories: '/resources/categories',
+    uploadImage: '/file/upload/image',
+    upload: '/file/upload',
   },
   profile: {
     myArticles: '/profile/my-articles',
