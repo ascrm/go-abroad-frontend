@@ -1,5 +1,6 @@
 import { authApi } from "@/src/api/auth";
 import { useAuthStore } from "@/src/stores/authStore";
+import { storage } from "@/src/utils/storage";
 import { User as UserType } from "@/src/types/auth";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -7,36 +8,65 @@ import { CheckCheck, KeyRound, LogOut, UserRoundPlus, X } from "lucide-react-nat
 import React, { useEffect, useState } from "react";
 import { Alert, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-// 历史账号信息
+interface HistoricalAccount {
+  user: UserType;
+  accountType: number;
+  accountValue: string;
+}
+
 interface AccountItem {
   user: UserType;
   isSelected: boolean;
+  accountType: number;
+  accountValue: string;
 }
 
 export default function SwitchAccountScreen() {
-  const { user: currentUser, logout } = useAuthStore();
+  const { user: currentUser, logout, checkAuth } = useAuthStore();
   const [accounts, setAccounts] = useState<AccountItem[]>([]);
 
   useEffect(() => {
-    // TODO: 从存储中获取历史账号列表
-    // 模拟数据，实际应该从 storage 或 API 获取
-    if (currentUser) {
-      setAccounts([
-        { user: currentUser, isSelected: true },
-      ]);
-    }
-  }, [currentUser]);
+    loadHistoryAccounts();
+  }, []);
 
-  const handleSelectAccount = (index: number) => {
-    const newAccounts = accounts.map((item, i) => ({
-      ...item,
-      isSelected: i === index,
+  const loadHistoryAccounts = async () => {
+    const historyAccounts = await storage.getHistoryAccounts();
+    const accountItems: AccountItem[] = historyAccounts.map((acc: HistoricalAccount) => ({
+      user: acc.user,
+      isSelected: acc.user.userId === currentUser?.userId,
+      accountType: acc.accountType,
+      accountValue: acc.accountValue,
     }));
-    setAccounts(newAccounts);
+    setAccounts(accountItems);
+  };
+
+  const handleSelectAccount = async (index: number) => {
+    const selectedAccount = accounts[index];
+
+    // 如果选中的就是当前账号，不需要切换
+    if (selectedAccount.isSelected) return;
+
+    // 保存当前账号到临时存储（用于可能的情况）
+    const currentHistoryAccounts = await storage.getHistoryAccounts();
+
+    // 调用切换账号API（后端需要支持）或直接重新登录
+    try {
+      // 调用后端切换账号接口
+      await authApi.switchAccount({
+        accountType: selectedAccount.accountType,
+        accountValue: selectedAccount.accountValue,
+      });
+
+      // 重新加载认证状态
+      await checkAuth();
+      loadHistoryAccounts();
+    } catch (error) {
+      console.log('切换账号失败:', error);
+    }
   };
 
   const handleAddAccount = () => {
-    router.push("/(auth)/login");
+    router.push("/(auth)/welcome");
   };
 
   const handleLogout = () => {
@@ -49,13 +79,10 @@ export default function SwitchAccountScreen() {
           text: "确定",
           onPress: async () => {
             try {
-              // 调用退出登录 API
               await authApi.logout();
             } catch (error) {
-              // API 调用失败不影响本地退出流程
               console.log('Logout API error:', error);
             } finally {
-              // 清除本地存储的登录状态
               await logout();
               router.replace("/(auth)/welcome");
             }
@@ -65,11 +92,19 @@ export default function SwitchAccountScreen() {
     );
   };
 
+  const getAccountTypeLabel = (accountType: number, accountValue: string) => {
+    switch (accountType) {
+      case 1: return '第三方登录';
+      case 2: return accountValue;
+      case 3: return accountValue.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+      default: return accountValue;
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
-      {/* 顶部标题栏 */}
+
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <TouchableOpacity
@@ -82,7 +117,6 @@ export default function SwitchAccountScreen() {
         </View>
       </View>
 
-      {/* 账号列表 */}
       <View style={styles.accountList}>
         {accounts.map((item, index) => (
           <TouchableOpacity
@@ -91,21 +125,18 @@ export default function SwitchAccountScreen() {
             onPress={() => handleSelectAccount(index)}
             activeOpacity={0.7}
           >
-            {/* 头像 */}
             <View style={styles.avatarContainer}>
               <Image
-                  source={{ uri: item.user.avatar }}
-                  style={styles.avatar}
-                />
+                source={{ uri: item.user.avatar }}
+                style={styles.avatar}
+              />
             </View>
 
-            {/* 用户信息 */}
             <View style={styles.userInfo}>
               <Text style={styles.nickname}>{item.user.nickname}</Text>
-              <Text style={styles.username}>@{item.user.username}</Text>
+              <Text style={styles.accountType}>{getAccountTypeLabel(item.accountType, item.accountValue)}</Text>
             </View>
 
-            {/* 选中标识 */}
             {item.isSelected && (
               <CheckCheck size={24} color="#10B981" />
             )}
@@ -113,7 +144,6 @@ export default function SwitchAccountScreen() {
         ))}
       </View>
 
-      {/* 底部操作选项 */}
       <View style={styles.bottomActions}>
         <TouchableOpacity
           style={styles.actionItem}
@@ -212,7 +242,7 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 2,
   },
-  username: {
+  accountType: {
     fontSize: 13,
     color: '#9CA3AF',
   },

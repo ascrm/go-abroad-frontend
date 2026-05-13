@@ -157,8 +157,25 @@ export default function SearchScreen() {
     Keyboard.dismiss();
   };
 
+  const handleItemPress = (item: SearchResult) => {
+    switch (item.type) {
+      case "article":
+        router.push({ pathname: "/(home)/article-detail", params: { id: item.id.replace("article-", "") } });
+        break;
+      case "plan":
+        router.push({ pathname: "/(plan)/plan-detail", params: { id: item.id.replace("plan-", "") } });
+        break;
+      case "qa":
+        router.push({ pathname: "/(home)/qa-detail", params: { id: item.id.replace("qa-", "") } });
+        break;
+      case "user":
+        router.push({ pathname: "/(tabs)/profile", params: { id: item.id.replace("user-", "") } });
+        break;
+    }
+  };
+
   const renderItem = ({ item }: { item: SearchResult }) => (
-    <TouchableOpacity style={styles.resultItem} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.resultItem} activeOpacity={0.7} onPress={() => handleItemPress(item)}>
       <View style={styles.resultContent}>
         <View style={styles.resultHeader}>
           <View style={[styles.typeTag, { backgroundColor: getTypeColor(item.type) + "20" }]}>

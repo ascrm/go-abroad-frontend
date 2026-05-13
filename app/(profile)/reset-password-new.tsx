@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import { authApi } from "../../src/api/auth";
 import { useResetPasswordStore } from "../../src/stores/resetPasswordStore";
 
 const PASSWORD_MIN = 6;
@@ -55,24 +56,34 @@ export default function ResetPasswordNewScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const { setPassword: setPasswordStore, reset } = useResetPasswordStore();
+  const { account, accountType, code, reset } = useResetPasswordStore();
 
   const isValid = password.length >= PASSWORD_MIN && password.length <= PASSWORD_MAX && password === confirmPassword && password !== "";
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!password.trim()) { Alert.alert("提示", "请输入新密码"); return; }
     if (password.length < PASSWORD_MIN || password.length > PASSWORD_MAX) { Alert.alert("提示", `密码长度为${PASSWORD_MIN}-${PASSWORD_MAX}位`); return; }
     if (password !== confirmPassword) { Alert.alert("提示", "两次输入的密码不一致"); return; }
-    setPasswordStore(password);
-    Alert.alert("修改成功", "请使用新密码登录", [
-      {
-        text: "确定",
-        onPress: () => {
-          reset();
-          router.replace("/(profile)/switch-account");
+
+    try {
+      await authApi.resetPasswordByCode({
+        accountType,
+        accountValue: account,
+        code,
+        newPassword: password,
+      });
+      Alert.alert("修改成功", "请使用新密码登录", [
+        {
+          text: "确定",
+          onPress: () => {
+            reset();
+            router.replace("/(profile)/switch-account");
+          },
         },
-      },
-    ]);
+      ]);
+    } catch (error: any) {
+      Alert.alert("修改失败", error?.message || "请稍后重试");
+    }
   };
 
   return (

@@ -1,10 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { User } from '@/src/types/auth';
 import type { Plan } from '@/src/types/plan';
+
+interface HistoricalAccount {
+  user: User;
+  accountType: number;
+  accountValue: string;
+}
 
 const AUTH_KEYS = {
   ACCESS_TOKEN: 'access_token',
   REFRESH_TOKEN: 'refresh_token',
   USER: 'user',
+  HISTORY_ACCOUNTS: 'history_accounts',
 };
 
 const PLAN_KEYS = {
@@ -43,6 +51,26 @@ export const storage = {
       AUTH_KEYS.REFRESH_TOKEN,
       AUTH_KEYS.USER,
     ]);
+  },
+
+  async getHistoryAccounts(): Promise<HistoricalAccount[]> {
+    const data = await AsyncStorage.getItem(AUTH_KEYS.HISTORY_ACCOUNTS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  async setHistoryAccounts(accounts: HistoricalAccount[]): Promise<void> {
+    await AsyncStorage.setItem(AUTH_KEYS.HISTORY_ACCOUNTS, JSON.stringify(accounts));
+  },
+
+  async addHistoryAccount(user: User, accountType: number, accountValue: string): Promise<void> {
+    const accounts = await this.getHistoryAccounts();
+    // 根据 accountType + accountValue 去重
+    const filtered = accounts.filter(a =>
+      !(a.accountType === accountType && a.accountValue === accountValue)
+    );
+    // 插入到最前面，最多保留5个
+    const newAccounts = [{ user, accountType, accountValue }, ...filtered].slice(0, 5);
+    await this.setHistoryAccounts(newAccounts);
   },
 
   async getGeneratingPlan(): Promise<Plan | null> {

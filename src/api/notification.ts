@@ -4,7 +4,6 @@ import type { PageR } from '../types/common';
 export interface NotificationResponse {
   id: number;
   type: string;
-  title: string;
   content: string;
   isRead: boolean;
   isPinned: boolean;
@@ -21,9 +20,14 @@ export interface NotificationResponse {
 
 export interface NotificationListResponse extends PageR<NotificationResponse[]> {}
 
-// 获取通知列表
+// 获取通知列表（非系统通知，按时间倒序）
 export async function getNotificationList(page = 1, pageSize = 20): Promise<NotificationListResponse> {
   return client.get('/notification/list', { params: { page, pageSize } });
+}
+
+// 获取系统通知列表
+export async function getSystemNotificationList(page = 1, pageSize = 20): Promise<NotificationListResponse> {
+  return client.get('/notification/system-list', { params: { page, pageSize } });
 }
 
 // 获取未读通知数量

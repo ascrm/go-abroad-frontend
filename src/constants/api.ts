@@ -9,6 +9,11 @@ export const API_ENDPOINTS = {
     socialLogin: '/auth/social/login',
     refresh: '/auth/refresh',
     logout: '/auth/logout',
+    switchAccount: '/auth/switch-account',
+    resetPassword: '/auth/reset-password',
+    resetPasswordByCode: '/auth/reset-password-by-code',
+    verifyAccount: '/auth/verify-account',
+    verifyCode: '/auth/verify-code',
   },
   user: {
     info: '/user/info',
@@ -87,6 +92,7 @@ export const API_ENDPOINTS = {
     myArticles: '/profile/my-articles',
     myFavoriteArticles: '/profile/my-favorite-articles',
     myBrowsedArticles: '/profile/my-browsed-articles',
+    myBrowsedQuestions: '/profile/my-browsed-questions',
   },
   search: {
     main: '/search',

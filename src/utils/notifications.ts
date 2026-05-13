@@ -65,6 +65,19 @@ export async function scheduleTaskReminder(
     await cancelTaskReminder(taskId);
 
     // 调度新通知
+    // iOS 要求触发时间必须在未来
+    const now = Date.now();
+    const triggerDate = new Date(reminderTime);
+    const triggerMs = triggerDate.getTime();
+
+    if (isNaN(triggerMs) || triggerMs <= now) {
+      console.warn('[Notification] Invalid or past trigger time, skipping. Trigger:', triggerMs, 'Now:', now);
+      return null;
+    }
+
+    console.log('[Notification] Scheduling for:', triggerDate.toISOString(), 'diff:', triggerMs - now, 'ms');
+
+    // 直接传递 Date 对象，库内部会自动转换为 timestamp
     const identifier = await Notifications.scheduleNotificationAsync({
       content: {
         title: '任务提醒',
@@ -73,8 +86,8 @@ export async function scheduleTaskReminder(
         sound: 'default',
       },
       trigger: {
-        type: Notifications.SchedulableNotificationTriggerTypes.DATE,
-        date: reminderTime,
+        type: Notifications.SchedulableTriggerInputTypes.DATE as any,
+        date: triggerDate,
       },
     });
 

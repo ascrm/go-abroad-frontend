@@ -49,6 +49,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     await storage.setRefreshToken(refreshToken);
     await storage.setUser(JSON.stringify(user));
 
+    // 保存到历史账号（账号类型需要根据输入判断，默认手机号）
+    await storage.addHistoryAccount(user, 3, account);
+
     set({ user, isAuthenticated: true });
     await syncGeneratingPlanAfterLogin();
   },
@@ -60,6 +63,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     await storage.setAccessToken(accessToken);
     await storage.setRefreshToken(refreshToken);
     await storage.setUser(JSON.stringify(user));
+
+    // 保存到历史账号
+    await storage.addHistoryAccount(user, accountType ?? 3, account);
 
     set({ user, isAuthenticated: true });
     await syncGeneratingPlanAfterLogin();
@@ -93,6 +99,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     await storage.setAccessToken(accessToken);
     await storage.setRefreshToken(refreshToken);
     await storage.setUser(JSON.stringify(user));
+
+    // 第三方登录accountType为1（微信等）
+    await storage.addHistoryAccount(user, 1, params.socialType.toString());
 
     set({ user, isAuthenticated: true });
     await syncGeneratingPlanAfterLogin();

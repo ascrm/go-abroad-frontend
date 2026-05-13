@@ -12,23 +12,36 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import { authApi } from "../../src/api/auth";
 import { useResetPasswordStore } from "../../src/stores/resetPasswordStore";
 
 export default function ResetPasswordAccountScreen() {
   const [inputValue, setInputValue] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
   const { setAccount } = useResetPasswordStore();
 
   const isEmail = inputValue.includes("@");
   const isValid = inputValue.length >= 5;
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!inputValue.trim()) {
       Alert.alert("提示", "请输入手机号或邮箱");
       return;
     }
-    const accountType = isEmail ? 2 : 1;
-    setAccount(inputValue, accountType);
-    router.push("/(profile)/reset-password-code");
+
+    const accountType = isEmail ? 2 : 3; // 2=邮箱, 3=手机号
+
+    // 验证账号是否属于当前用户
+    setIsVerifying(true);
+    try {
+      await authApi.verifyAccount({ accountType, accountValue: inputValue });
+      setAccount(inputValue, accountType);
+      router.push("/(profile)/reset-password-code");
+    } catch (error: any) {
+      Alert.alert("验证失败", error?.message || "该账号未注册或不属于当前用户");
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   return (
@@ -56,18 +69,21 @@ export default function ResetPasswordAccountScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType={isEmail ? "email-address" : "phone-pad"}
+              editable={!isVerifying}
             />
           </View>
         </Animated.View>
 
         <Animated.View entering={FadeInUp.duration(500).delay(200).springify()} style={styles.buttonSection}>
           <TouchableOpacity
-            style={[styles.primaryButton, !isValid && styles.primaryButtonDisabled]}
+            style={[styles.primaryButton, (!isValid || isVerifying) && styles.primaryButtonDisabled]}
             activeOpacity={0.8}
             onPress={handleNext}
-            disabled={!isValid}
+            disabled={!isValid || isVerifying}
           >
-            <Text style={[styles.primaryButtonText, !isValid && styles.primaryButtonTextDisabled]}>下一步</Text>
+            <Text style={[styles.primaryButtonText, (!isValid || isVerifying) && styles.primaryButtonTextDisabled]}>
+              {isVerifying ? "验证中..." : "下一步"}
+            </Text>
           </TouchableOpacity>
         </Animated.View>
       </KeyboardAvoidingView>

@@ -11,6 +11,7 @@ import {
   requestNotificationPermissions,
   addNotificationResponseListener,
 } from "@/src/utils/notifications";
+import { useAuthStore } from "@/src/stores/authStore";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -20,6 +21,8 @@ export default function RootLayout() {
   useEffect(() => {
     // 准备完成后隐藏原生启动屏
     SplashScreen.hideAsync();
+    // 初始化登录状态
+    useAuthStore.getState().checkAuth();
   }, []);
 
   // 请求通知权限并设置通知点击监听

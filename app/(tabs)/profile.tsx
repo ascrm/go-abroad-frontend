@@ -1,14 +1,13 @@
-import { useUserProfile, useMyArticles, useMyFavoriteArticles, useMyBrowsedArticles, useMyPlans } from "@/src/hooks/useProfile";
+import { useUserProfile, useMyArticles, useMyFavoriteArticles, useMyBrowsedArticles, useMyPlans, useMyBrowsedQuestions } from "@/src/hooks/useProfile";
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
-import { Bell, ChevronDown, FileText, Settings, MapPin, Clock } from "lucide-react-native";
+import { Bell, ChevronDown, FileText, Settings, MapPin, Clock, Search } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import { ImageBackground, Pressable, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeIn, FadeInDown, useSharedValue, useAnimatedStyle, withTiming, interpolate, Layout } from "react-native-reanimated";
 import { useQueryClient } from "@tanstack/react-query";
-import type { ArticleResponse } from "@/src/types/home";
-import type { QuestionItem } from "@/src/api/home";
+import type { ArticleResponse, Question } from "@/src/types/home";
 import type { Plan } from "@/src/api/plan";
 
 type HistoryTab = 'article' | 'question';
@@ -82,19 +81,21 @@ function PlanSkeleton() {
 // ============================================
 // 规划列表区
 // ============================================
-function PlanSection({ plans }: { plans: Plan[] }) {
+function PlanSection({ plans, onManage }: { plans: Plan[]; onManage: () => void }) {
+  const displayPlans = plans.slice(0, 5);
+
   return (
     <Animated.View entering={FadeIn.duration(300)} className="px-4 pt-6">
       <View className="flex-row justify-between items-center mb-4 px-1">
         <Text className="text-lg font-bold text-gray-900">规划列表</Text>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={onManage}>
           <Text className="text-sm font-medium text-blue-600">管理</Text>
         </TouchableOpacity>
       </View>
 
       <View className="bg-white rounded-2xl">
-        {plans.length > 0 ? (
-          plans.map((plan, index) => {
+        {displayPlans.length > 0 ? (
+          displayPlans.map((plan, index) => {
             const totalTasks = plan.phases?.flatMap(p => p.tasks || []).length || 0;
             const completedTasks = plan.phases?.flatMap(p => p.tasks || []).filter(t => t.isCompleted).length || 0;
             const percent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
@@ -102,8 +103,9 @@ function PlanSection({ plans }: { plans: Plan[] }) {
             return (
               <Pressable
                 key={plan.id}
-                className={`px-4 py-3 active:opacity-80 ${index < plans.length - 1 ? 'border-b border-gray-100' : ''}`}
+                className={`px-4 py-3 active:opacity-80 ${index < displayPlans.length - 1 ? 'border-b border-gray-100' : ''}`}
                 accessibilityLabel={plan.title}
+                onPress={() => router.push({ pathname: "/(plan)/plan-detail", params: { id: String(plan.id) } })}
               >
                 {/* 类型标签 */}
                 <View className="flex-row items-center mb-2">
@@ -187,31 +189,31 @@ function ArticleCard({ item, onPress }: { item: ArticleResponse; onPress: () => 
 // ============================================
 // 问答卡片组件
 // ============================================
-function QuestionCard({ item }: { item: QuestionItem }) {
+function QuestionCard({ item, onPress }: { item: Question; onPress: () => void }) {
   return (
-    <View className="px-4 py-3">
+    <Pressable className="px-4 py-3 active:opacity-80" onPress={onPress}>
       <View className="flex-row items-center mb-2">
         <View className="w-6 h-6 rounded-full bg-gray-200 items-center justify-center mr-2">
           <Text className="text-xs text-gray-600 font-medium">
-            {item.author.charAt(0).toUpperCase()}
+            {item.author?.nickname?.charAt(0).toUpperCase() || item.author?.username?.charAt(0).toUpperCase() || "游"}
           </Text>
         </View>
-        <Text className="text-sm text-gray-500">{item.author}</Text>
+        <Text className="text-sm text-gray-500">{item.author?.nickname || "旅行用户"}</Text>
       </View>
       <Text className="text-base font-semibold text-gray-800 leading-snug mb-2" numberOfLines={2}>
         {item.title}
       </Text>
       <View className="flex-row items-center justify-between">
         <View className="flex-row items-center">
-          <Text className="text-xs text-gray-400">{item.views} 回答</Text>
+          <Text className="text-xs text-gray-400">{item.repliesCount || 0} 回答</Text>
           <Text className="text-xs text-gray-300 mx-2">·</Text>
-          <Text className="text-xs text-gray-400">{item.views} 关注</Text>
+          <Text className="text-xs text-gray-400">{item.views} 浏览</Text>
         </View>
         <View className="bg-blue-50 px-3 py-1.5 rounded-full">
           <Text className="text-xs font-medium text-blue-500">写回答</Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -231,7 +233,7 @@ export default function ProfileScreen() {
   const { data: myFavorites = [], isLoading: favoritesLoading } = useMyFavoriteArticles();
   const { data: myHistory = [], isLoading: historyLoading } = useMyBrowsedArticles();
   const { data: plans = [], isLoading: plansLoading } = useMyPlans();
-  const questionHistory = [];
+  const { data: questionHistory = [], isLoading: questionsLoading } = useMyBrowsedQuestions();
 
   const isContentLoading = articlesLoading || favoritesLoading || historyLoading;
 
@@ -241,6 +243,7 @@ export default function ProfileScreen() {
       queryClient.invalidateQueries({ queryKey: ["profile", "myArticles"] });
       queryClient.invalidateQueries({ queryKey: ["profile", "myFavoriteArticles"] });
       queryClient.invalidateQueries({ queryKey: ["profile", "myBrowsedArticles"] });
+      queryClient.invalidateQueries({ queryKey: ["profile", "myBrowsedQuestions"] });
       queryClient.invalidateQueries({ queryKey: ["profile", "plans"] });
     }, [queryClient])
   );
@@ -290,6 +293,13 @@ export default function ProfileScreen() {
                 onPress={() => router.push("/(profile)/messages")}
               >
                 <Bell size={22} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityLabel="搜索"
+                className="p-2 rounded-full active:bg-white/20"
+                onPress={() => router.push("/(home)/search")}
+              >
+                <Search size={22} color="#fff" />
               </TouchableOpacity>
               <TouchableOpacity
                 accessibilityLabel="设置"
@@ -464,13 +474,15 @@ export default function ProfileScreen() {
               <View className="px-4 bg-white mx-4 rounded-2xl">
                 {questionHistory.length > 0 ? (
                   questionHistory.map((item, index) => (
-                    <Pressable
+                    <View
                       key={item.id}
-                      className={`px-4 py-3 active:opacity-80 ${index < questionHistory.length - 1 ? 'border-b border-gray-100' : ''}`}
-                      accessibilityLabel={item.title}
+                      className={`${index < questionHistory.length - 1 ? 'border-b border-gray-100' : ''}`}
                     >
-                      <QuestionCard item={item} />
-                    </Pressable>
+                      <QuestionCard
+                        item={item}
+                        onPress={() => router.push({ pathname: "/(home)/qa-detail", params: { id: String(item.id) } })}
+                      />
+                    </View>
                   ))
                 ) : (
                   <View className="items-center justify-center py-8">
@@ -481,7 +493,10 @@ export default function ProfileScreen() {
             )}
 
             {/* 规划列表区 */}
-            <PlanSection plans={plans.list || []} />
+            <PlanSection
+              plans={plans.list || []}
+              onManage={() => router.push("/(plan)/plan-list")}
+            />
           </Animated.View>
         )}
       </ScrollView>

@@ -1,12 +1,14 @@
 import { router } from "expo-router";
-import { Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Bell, MessageCircle, Pin, PinOff, Trash2, X } from "lucide-react-native";
 import React, { useState, useRef, useCallback } from "react";
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useFocusEffect } from "expo-router";
+import {Image} from 'expo-image'
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   getNotificationList,
+  getSystemNotificationList,
   markAsRead,
   togglePin,
   deleteNotification,
@@ -17,12 +19,44 @@ const getTypeColor = (type: string) => {
   switch (type) {
     case "system":
       return "#3B82F6";
+    case "like":
+      return "#EF4444";
+    case "favorite":
+      return "#F59E0B";
     case "comment":
       return "#10B981";
-    case "answer":
+    case "reply":
       return "#8B5CF6";
     default:
       return "#6B7280";
+  }
+};
+
+const getTypeText = (type: string) => {
+  switch (type) {
+    case "like":
+      return "点赞";
+    case "favorite":
+      return "收藏";
+    case "comment":
+      return "评论";
+    case "reply":
+      return "回复";
+    default:
+      return "通知";
+  }
+};
+
+const getRelatedTypeText = (relatedType?: string) => {
+  switch (relatedType) {
+    case "article":
+      return "文章";
+    case "question":
+      return "提问";
+    case "comment":
+      return "评论";
+    default:
+      return "内容";
   }
 };
 
@@ -30,13 +64,10 @@ const getNotificationTitle = (item: NotificationResponse): string => {
   if (item.type === "system") {
     return "系统通知";
   }
-  if (item.type === "comment") {
-    return item.actor?.nickname ? `${item.actor.nickname}评论了你的文章` : "有人评论了你的文章";
-  }
-  if (item.type === "answer") {
-    return item.actor?.nickname ? `${item.actor.nickname}回复了你的提问` : "有人回复了你的问题";
-  }
-  return item.title;
+  const actorName = item.actor?.nickname || "有人";
+  const action = getTypeText(item.type);
+  const target = getRelatedTypeText(item.relatedType);
+  return `${actorName}${action}了你的${target}`;
 };
 
 interface SwipeActionProps {
@@ -68,22 +99,52 @@ function SwipeActions({ isPinned, onTogglePin, onDelete }: SwipeActionProps) {
   );
 }
 
+function SystemNotificationCard({ latestContent, onPress }: { latestContent?: string; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={styles.systemNotificationItem} activeOpacity={0.8} onPress={onPress}>
+      <View style={styles.messageItemRow}>
+        <View style={styles.avatarWrapper}>
+          <View style={[styles.avatarContainer, { backgroundColor: getTypeColor("system") + "20" }]}>
+            <Bell size={24} color={getTypeColor("system")} />
+          </View>
+        </View>
+        <View style={styles.messageContent}>
+          <View style={styles.row1}>
+            <Text style={styles.systemNotificationTitle} numberOfLines={1}>
+              系统通知
+            </Text>
+          </View>
+          <Text style={styles.systemNotificationDesc} numberOfLines={1}>
+            {latestContent || "暂无系统通知"}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 export default function MessagesScreen() {
   const [notifications, setNotifications] = useState<NotificationResponse[]>([]);
+  const [systemNotifications, setSystemNotifications] = useState<NotificationResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const swipeableRefs = useRef<Map<number, Swipeable>>(new Map());
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);
     try {
+      // 加载非系统通知
       const res = await getNotificationList(1, 50);
       if (res && res.list) {
         setNotifications(res.list);
-        // 清理已删除的 refs
         swipeableRefs.current.forEach((ref, id) => {
           const exists = res.list.some(item => item.id === id);
           if (!exists) swipeableRefs.current.delete(id);
         });
+      }
+      // 加载系统通知
+      const systemRes = await getSystemNotificationList(1, 1);
+      if (systemRes && systemRes.list && systemRes.list.length > 0) {
+        setSystemNotifications(systemRes.list);
       }
     } catch (error) {
       console.error("加载通知失败:", error);
@@ -157,21 +218,16 @@ export default function MessagesScreen() {
               console.error("标记已读失败:", error);
             }
           }
-          // 根据 relatedType 跳转到对应页面
           if (item.relatedType === "article" && item.relatedId) {
-            router.push(`/home/article/${item.relatedId}`);
+            router.push(`/article-detail?id=${item.relatedId}`);
           } else if (item.relatedType === "question" && item.relatedId) {
-            router.push(`/home/question/${item.relatedId}`);
+            router.push(`/qa-detail?id=${item.relatedId}`);
           }
         }}
       >
         <View style={styles.messageItemRow}>
         <View style={styles.avatarWrapper}>
-          {item.type === "system" ? (
-            <View style={[styles.avatarContainer, { backgroundColor: getTypeColor(item.type) + "20" }]}>
-              <Bell size={24} color={getTypeColor(item.type)} />
-            </View>
-          ) : item.actor?.avatar ? (
+          {item.actor?.avatar ? (
             <Image source={{ uri: item.actor.avatar }} style={styles.userAvatar} />
           ) : (
             <View style={[styles.avatarContainer, { backgroundColor: getTypeColor(item.type) + "20" }]}>
@@ -196,6 +252,13 @@ export default function MessagesScreen() {
       </View>
       </TouchableOpacity>
     </Swipeable>
+  );
+
+  const ListHeaderComponent = () => (
+    <SystemNotificationCard
+      latestContent={systemNotifications[0]?.content}
+      onPress={() => router.push("/system-notifications")}
+    />
   );
 
   const ListEmptyComponent = () => (
@@ -223,6 +286,7 @@ export default function MessagesScreen() {
         data={notifications}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
+        ListHeaderComponent={ListHeaderComponent}
         ListEmptyComponent={ListEmptyComponent}
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -263,6 +327,22 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexGrow: 1,
+  },
+  systemNotificationItem: {
+    backgroundColor: "#FEF3C7",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  systemNotificationTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#92400E",
+    flexShrink: 1,
+  },
+  systemNotificationDesc: {
+    fontSize: 14,
+    color: "#B45309",
+    flex: 1,
   },
   messageItem: {
     backgroundColor: "white",

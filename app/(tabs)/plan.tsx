@@ -707,7 +707,10 @@ export default function PlanScreen() {
     if (!currentBellTask) return;
     setReminderLoading(true);
     try {
-      const reminderTime = date.toISOString();
+      // 取出本地年/月/日/时/分，构造 UTC ISO 字符串（避免 toISOString 的时区转换问题）
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const utcDateStr = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.000Z`;
+      const reminderTime = utcDateStr;
       const updated = await planApi.updateTask({
         id: currentBellTask.id,
         reminderTime,
@@ -721,7 +724,7 @@ export default function PlanScreen() {
       })));
       // 调度系统通知
       if (updated.reminderTime) {
-        await scheduleTaskReminder(currentBellTask.id, currentBellTask.title, new Date(updated.reminderTime));
+        await scheduleTaskReminder(currentBellTask.id, currentBellTask.title, date);
       } else {
         await cancelTaskReminder(currentBellTask.id);
       }

@@ -19,6 +19,7 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from "react-native-reanimated";
+import { authApi } from "../../src/api/auth";
 import { useResetPasswordStore } from "../../src/stores/resetPasswordStore";
 
 const CODE_LENGTH = 6;
@@ -63,6 +64,7 @@ export default function ResetPasswordCodeScreen() {
   const [code, setCode] = useState("");
   const [countdown, setCountdown] = useState(60);
   const [isFocused, setIsFocused] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
   const { account, accountType, setCode: setCodeStore } = useResetPasswordStore();
@@ -82,16 +84,34 @@ export default function ResetPasswordCodeScreen() {
     setCode(numericText);
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (countdown > 0) return;
-    setCountdown(60);
-    Alert.alert("提示", accountType === 2 ? "验证码已发送到邮箱" : "验证码已发送到手机");
+    try {
+      await authApi.sendCode({ accountType: accountType as 2 | 3, account, codeType: 3 });
+      setCountdown(60);
+      Alert.alert("提示", "验证码已发送");
+    } catch (error: any) {
+      Alert.alert("发送失败", error?.message || "请稍后重试");
+    }
   };
 
-  const handleNext = () => {
-    if (code.length !== CODE_LENGTH) { Alert.alert("提示", "请输入完整的6位验证码"); return; }
-    setCodeStore(code);
-    router.push("/(profile)/reset-password-new");
+  const handleNext = async () => {
+    if (code.length !== CODE_LENGTH) {
+      Alert.alert("提示", "请输入完整的6位验证码");
+      return;
+    }
+
+    // 验证验证码是否正确
+    setIsVerifying(true);
+    try {
+      await authApi.verifyCode({ accountType, account, code });
+      setCodeStore(code);
+      router.push("/(profile)/reset-password-new");
+    } catch (error: any) {
+      Alert.alert("验证失败", error?.message || "验证码错误或已过期");
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   const handleBoxPress = () => { inputRef.current?.focus(); };
@@ -135,8 +155,15 @@ export default function ResetPasswordCodeScreen() {
         </Animated.View>
 
         <Animated.View entering={FadeInUp.duration(500).delay(300).springify()} style={styles.buttonSection}>
-          <TouchableOpacity style={[styles.primaryButton, !isComplete && styles.primaryButtonDisabled]} activeOpacity={0.8} onPress={handleNext} disabled={!isComplete}>
-            <Text style={[styles.primaryButtonText, !isComplete && styles.primaryButtonTextDisabled]}>下一步</Text>
+          <TouchableOpacity
+            style={[styles.primaryButton, (!isComplete || isVerifying) && styles.primaryButtonDisabled]}
+            activeOpacity={0.8}
+            onPress={handleNext}
+            disabled={!isComplete || isVerifying}
+          >
+            <Text style={[styles.primaryButtonText, (!isComplete || isVerifying) && styles.primaryButtonTextDisabled]}>
+              {isVerifying ? "验证中..." : "下一步"}
+            </Text>
           </TouchableOpacity>
         </Animated.View>
       </KeyboardAvoidingView>
