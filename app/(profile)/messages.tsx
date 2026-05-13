@@ -290,8 +290,6 @@ export default function MessagesScreen() {
         ListEmptyComponent={ListEmptyComponent}
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
-        refreshing={loading}
-        onRefresh={loadNotifications}
       />
     </SafeAreaView>
   );

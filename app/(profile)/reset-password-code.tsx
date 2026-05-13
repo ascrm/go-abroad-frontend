@@ -69,6 +69,20 @@ export default function ResetPasswordCodeScreen() {
 
   const { account, accountType, setCode: setCodeStore } = useResetPasswordStore();
 
+  // 页面加载时自动发送验证码
+  useEffect(() => {
+    if (!account || !accountType) return;
+
+    const sendVerificationCode = async () => {
+      try {
+        await authApi.sendCode({ accountType: accountType as 2 | 3, account, codeType: 3 });
+      } catch (error) {
+        console.log("发送验证码失败:", error);
+      }
+    };
+    sendVerificationCode();
+  }, [account, accountType]);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCountdown((prev) => {

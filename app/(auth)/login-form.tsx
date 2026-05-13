@@ -94,7 +94,7 @@ export default function LoginFormScreen() {
         </View>
                  {/* 忘记密码 */}
         <View className="flex-row justify-end mt-2">
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push("/(profile)/reset-password-account")}>
             <Text className="text-blue-500 text-sm">忘记密码？</Text>
           </TouchableOpacity>
         </View>

@@ -4,6 +4,7 @@ export interface User {
   username: string;
   nickname: string;
   avatar?: string;
+  bgUrl?: string;
   gender: 0 | 1 | 2; // 0-未知, 1-男, 2-女
 }
 

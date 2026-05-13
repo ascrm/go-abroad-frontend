@@ -68,12 +68,11 @@ client.interceptors.response.use(
       return Promise.reject(new Error(msg));
     }
 
-    // 约定：业务 code=20000 才算“业务成功”
+    // 约定：业务 code=20000 才算”业务成功”
     const payload = response.data as ApiResponse;
     if (payload && payload.code !== 20000) {
       const msg = getResponseMessage(payload);
-      Alert.alert('业务失败', msg);
-      return null;
+      return Promise.reject(new Error(msg));
     }
 
     return payload.data;

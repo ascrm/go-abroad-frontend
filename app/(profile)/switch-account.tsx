@@ -78,14 +78,10 @@ export default function SwitchAccountScreen() {
         {
           text: "确定",
           onPress: async () => {
-            try {
-              await authApi.logout();
-            } catch (error) {
-              console.log('Logout API error:', error);
-            } finally {
-              await logout();
-              router.replace("/(auth)/welcome");
-            }
+            // 异步发送退出请求，不阻塞跳转
+            authApi.logout().catch(console.log);
+            await logout();
+            router.replace("/(auth)/welcome");
           },
         },
       ]

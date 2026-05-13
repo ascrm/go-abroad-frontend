@@ -178,9 +178,16 @@ function ArticleCard({ item, onPress }: { item: ArticleResponse; onPress: () => 
         <Text className="text-sm font-semibold text-gray-800 leading-snug mb-1" numberOfLines={2}>
           {item.title}
         </Text>
-        <Text className="text-xs text-gray-400">
-          {item.author?.nickname || '未知作者'} · {item.views}
-        </Text>
+        <View className="flex-row items-center">
+          <Image
+            source={{ uri: item.author?.avatar || "https://api.dicebear.com/7.x/avataaars/png?seed=default" }}
+            style={{ width: 20, height: 20, borderRadius: 10 }}
+            contentFit="cover"
+          />
+          <Text className="text-xs text-gray-500 ml-1.5">
+            {item.author?.nickname || '未知作者'}
+          </Text>
+        </View>
       </View>
     </Pressable>
   );
@@ -204,11 +211,7 @@ function QuestionCard({ item, onPress }: { item: Question; onPress: () => void }
         {item.title}
       </Text>
       <View className="flex-row items-center justify-between">
-        <View className="flex-row items-center">
-          <Text className="text-xs text-gray-400">{item.repliesCount || 0} 回答</Text>
-          <Text className="text-xs text-gray-300 mx-2">·</Text>
-          <Text className="text-xs text-gray-400">{item.views} 浏览</Text>
-        </View>
+        <Text className="text-xs text-gray-400">{item.repliesCount || 0} 回答</Text>
         <View className="bg-blue-50 px-3 py-1.5 rounded-full">
           <Text className="text-xs font-medium text-blue-500">写回答</Text>
         </View>
@@ -245,6 +248,7 @@ export default function ProfileScreen() {
       queryClient.invalidateQueries({ queryKey: ["profile", "myBrowsedArticles"] });
       queryClient.invalidateQueries({ queryKey: ["profile", "myBrowsedQuestions"] });
       queryClient.invalidateQueries({ queryKey: ["profile", "plans"] });
+      queryClient.invalidateQueries({ queryKey: ["profile", "user"] });
     }, [queryClient])
   );
 
@@ -323,11 +327,11 @@ export default function ProfileScreen() {
         {/* 背景图区域 */}
         <ImageBackground
           source={require('@/assets/images/profile-bg.png')}
-          style={{ width: '100%', height: 200 }}
+          style={{ width: '100%', height: 250 }}
           resizeMode="cover"
         >
           <View className="px-5 pb-6"
-            style={{ paddingTop: 118 }}>
+            style={{ paddingTop: 160 }}>
             {/* 用户信息 */}
             <Pressable
               accessibilityLabel={`${user?.nickname || "未登录用户"}，点击编辑资料`}
